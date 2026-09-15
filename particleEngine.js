@@ -483,6 +483,126 @@ const handlers = {
       bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
     }
   },
+
+  // Station 4: "Academia + Industria + Ciudad" -- three named forces, plainly
+  // a triad. Three distinct clusters (not a single merged mass), each with
+  // its own anchor and its own subtle tint of institution-indigo, joined by
+  // a triangle of bonds in the PURE institution color -- the connection
+  // itself belongs to the University, which is what holds these three
+  // together. All three clusters share the exact same motion character
+  // (same radius, same breathing rhythm, same texture): equal treatment as
+  // the structural statement that these are equal partners, deliberately
+  // unlike station 1's asymmetric elder/young pair.
+  'triad-forces'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+
+    if (!sys._triadSetup) {
+      sys._triadSetup = true;
+      const groupSize = Math.floor(sys.n / 3);
+      const ranges = [[0, groupSize], [groupSize, groupSize * 2], [groupSize * 2, sys.n]];
+      sys._triadRanges = ranges;
+
+      const ax = 0.95, ay = 0.85;
+      const anchors = [
+        new THREE.Vector3(0, ay, 0),           // Academia: apex
+        new THREE.Vector3(-ax, -ay * 0.55, 0), // Industria: lower-left
+        new THREE.Vector3(ax, -ay * 0.55, 0),  // Ciudad: lower-right
+      ];
+      sys._triadAnchors = anchors;
+
+      // Subtle tints of institution-indigo, one per cluster -- Industria
+      // shifted warmer, Ciudad shifted cooler, Academia stays pure.
+      const hsl = { h: 0, s: 0, l: 0 };
+      institution.getHSL(hsl);
+      const warm = new THREE.Color().setHSL(hsl.h + 0.035, hsl.s * 0.92, Math.min(0.8, hsl.l * 1.1));
+      const cool = new THREE.Color().setHSL(hsl.h - 0.035, hsl.s * 0.92, Math.min(0.8, hsl.l * 1.1));
+      sys._triadTints = [institution, warm, cool];
+
+      // The particle in each cluster that faces a given neighbor, used to
+      // anchor that pairwise bond -- the same "innermost" technique as
+      // station 1's bridges, so the triangle connects real, chosen particles.
+      const facing = (range, dir) => {
+        let best = -1, bestScore = -Infinity;
+        for (let i = range[0]; i < range[1]; i++) {
+          const score = sys.baseDir[i * 3 + 0] * dir.x + sys.baseDir[i * 3 + 1] * dir.y + sys.baseDir[i * 3 + 2] * dir.z;
+          if (score > bestScore) { bestScore = score; best = i; }
+        }
+        return best;
+      };
+      const pairs = [[0, 1], [1, 2], [2, 0]];
+      const triangle = pairs.map(([ia, ib]) => {
+        const dirAB = anchors[ib].clone().sub(anchors[ia]).normalize();
+        return [facing(ranges[ia], dirAB), facing(ranges[ib], dirAB.clone().negate())];
+      });
+      sys._triadTriangle = triangle;
+
+      // A little internal texture per cluster: fixed-pair bonds, same
+      // density for all three (equal treatment).
+      const internal = [];
+      for (let g = 0; g < 3; g++) {
+        const [from, to] = ranges[g];
+        const span = to - from;
+        for (let k = 0; k < 12; k++) {
+          const a = from + (k * 11) % span, b = from + (k * 11 + 23) % span;
+          if (a !== b) internal.push([a, b, g]);
+        }
+      }
+      sys._triadInternal = internal;
+      sys.bonds.geometry.setDrawRange(0, (triangle.length + internal.length) * 2);
+    }
+
+    const ranges = sys._triadRanges, anchors = sys._triadAnchors, tints = sys._triadTints;
+    const clusterRadius = config.station.cloudRadius * 0.34;
+    const rot = elapsed * 0.12; // one shared rotation -- same for every cluster
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+
+    for (let g = 0; g < 3; g++) {
+      const [from, to] = ranges[g];
+      const anchor = anchors[g];
+      const tint = tints[g];
+      // Phase-offset slightly per cluster so the three don't breathe in
+      // perfect unison (feels alive), but same amplitude and rhythm.
+      const breathe = 0.5 + 0.5 * Math.sin(elapsed * 0.9 + g * 2.1);
+      for (let i = from; i < to; i++) {
+        const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+        const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
+        const r = clusterRadius * sys.baseR[i] * (0.7 + 0.25 * breathe + e * 0.1);
+        pos[i * 3 + 0] = cx + anchor.x + rx * r;
+        pos[i * 3 + 1] = cy + anchor.y + dy * r;
+        pos[i * 3 + 2] = cz + anchor.z + rz * r;
+
+        const b = 0.36 + e * 0.28 + breathe * 0.1;
+        col[i * 3 + 0] = tint.r * b;
+        col[i * 3 + 1] = tint.g * b;
+        col[i * 3 + 2] = tint.b * b;
+      }
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    let k = 0;
+    const pulse = 0.6 + 0.4 * Math.sin(elapsed * 0.7); // the three, breathing as one
+    for (const [a, b] of sys._triadTriangle) {
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const v = 0.3 + 0.14 * pulse; // solid and confident: this connection already exists
+      bcol[p0 + 0] = institution.r * v; bcol[p0 + 1] = institution.g * v; bcol[p0 + 2] = institution.b * v;
+      bcol[p1 + 0] = institution.r * v; bcol[p1 + 1] = institution.g * v; bcol[p1 + 2] = institution.b * v;
+    }
+    for (const [a, b, g] of sys._triadInternal) {
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const tint = tints[g];
+      const v = 0.14;
+      bcol[p0 + 0] = tint.r * v; bcol[p0 + 1] = tint.g * v; bcol[p0 + 2] = tint.b * v;
+      bcol[p1 + 0] = tint.r * v; bcol[p1 + 1] = tint.g * v; bcol[p1 + 2] = tint.b * v;
+    }
+  },
 };
 
 export class ParticleEngine {

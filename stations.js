@@ -51,7 +51,7 @@ export const stations = [
   },
   {
     slide: 4,
-    state: 'placeholder',
+    state: 'triad-forces',
     intensity: 0.6,
     accent: 0.35,
     photo: 2,
