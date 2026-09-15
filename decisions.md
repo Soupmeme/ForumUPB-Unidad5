@@ -73,6 +73,9 @@ Implementacion actual:
 ### D12 — Herramienta: img2threejs instalado, pero autoria directa para la mano
 Se instalo Python 3.12 e img2threejs (la herramienta que menciona el handoff). Corre de punta a punta aqui: se autoro una especificacion completa de la mano (palma, dedos, pulgar, material de piel, evidencia PBR, iluminacion) que PASO la validacion estricta y genero una fabrica de Three.js. Pero img2threejs construye pase por pase (blockout -> estructura -> forma -> material -> iluminacion) y cada pase esta bloqueado detras de un bucle de revision (render + hoja comparativa + diferencia interior + puntaje de vision + revision registrada). Llegar a una mano terminada exige recorrer ese circuito varias veces, y emite TypeScript que hay que empaquetar para nuestro proyecto de JS plano. Kiwi eligio, con ese costo a la vista, que yo autorara la mano directamente en Three.js reutilizando todo el analisis. La herramienta queda instalada por si se quiere para props mas simples (un marco, una luminaria) mas adelante.
 
+### D14 — Hilo conductor: las venas bajan a la altura del piso
+Kiwi senalo que las venas helicoidales de las paredes (D10) a veces se perdian dentro de la masa de particulas de cada estacion, al compartir casi la misma altura. Se baja el eje de las venas de 3.0 a 1.05 unidades sobre la linea de piso (`config.thread.height`), lejos de la altura de las masas de las estaciones (~3.5). Con el campo de vision amplio de la camara siguen siendo claramente visibles corriendo cerca del piso a lo largo del pasillo.
+
 ## Lo que NO se importa del referente (recordatorio permanente)
 La espiral como ancla estable, la metáfora de órbita/comunidad, los nombres y valores de los parámetros de comportamiento del profesor (spiral/network/architecture/archive/stability), el formato de lienzo 2D a sangre completa, y la paleta cian/rojo/magenta ligada al branding de ese evento.
 

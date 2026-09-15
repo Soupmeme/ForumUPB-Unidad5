@@ -41,7 +41,7 @@ export const config = {
     strands: 2,            // two veins, one down each side wall (relevo: two generations flanking the path)
     radius: 0.7,           // coil radius of each wall vein
     wallOffset: 4.0,       // how far from center each vein runs (walls are at +/-5)
-    height: 3.0,           // center height of each coil axis above the floor line
+    height: 1.05,          // center height of each coil axis above the floor line (near-floor, clear of the station mass)
     turns: 14,             // total helical turns across the whole hall
     flowSpeed: 0.02,       // gentle ambient drift along the hall (u/sec)
     spin: 0.14,            // slow rotation of the whole helix (rad/sec)
