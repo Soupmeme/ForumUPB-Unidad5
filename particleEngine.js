@@ -14,6 +14,7 @@ import { config } from './config.js';
 
 const elder = new THREE.Color(config.palette.accentElder);
 const young = new THREE.Color(config.palette.accentYoung);
+const hot = new THREE.Color(0xfff2d0);
 
 // One station's particle cloud: a fixed pool that reconfigures (it does not
 // birth/die). Persistent particles read as transformation, which fits a
@@ -103,6 +104,56 @@ const handlers = {
       pos[i * 3 + 2] = cz + rz * r;
 
       const b = 0.4 + e * 0.6;
+      col[i * 3 + 0] = c.r * b;
+      col[i * 3 + 1] = c.g * b;
+      col[i * 3 + 2] = c.b * b;
+    }
+  },
+
+  // Station 1: a soft mass of latent potential that slowly breathes, and where
+  // the reaching hand enters (sys.reachPoint, world space), the nearest
+  // particles lift toward the fingertips and brighten (potential being reached).
+  'latent-reach'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const e = sys.params.energy;
+    const breathe = 0.5 + 0.5 * Math.sin(elapsed * 1.05); // slow held-breath pulse
+    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
+    const c = new THREE.Color();
+    const rp = sys.reachPoint || null;
+    const reachR = 1.0;
+    const rot = elapsed * 0.08;
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+
+    for (let i = 0; i < sys.n; i++) {
+      let dx = sys.baseDir[i * 3 + 0];
+      const dy = sys.baseDir[i * 3 + 1];
+      let dz = sys.baseDir[i * 3 + 2];
+      const rx = dx * cs - dz * sn;
+      const rz = dx * sn + dz * cs;
+      const r = config.station.cloudRadius * sys.baseR[i] * (0.7 + 0.22 * breathe + e * 0.18);
+      let px = cx + rx * r;
+      let py = cy + dy * r;
+      let pz = cz + rz * r;
+
+      // Reach response: proximity to the fingertips pulls and brightens.
+      let g = 0;
+      if (rp) {
+        const ddx = px - rp.x, ddy = py - rp.y, ddz = pz - rp.z;
+        const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+        g = Math.exp(-(dist / reachR) * (dist / reachR));
+        const pull = g * 0.55;
+        px += (rp.x - px) * pull;
+        py += (rp.y - py) * pull;
+        pz += (rp.z - pz) * pull;
+      }
+      pos[i * 3 + 0] = px;
+      pos[i * 3 + 1] = py;
+      pos[i * 3 + 2] = pz;
+
+      c.copy(base).lerp(hot, g * 0.7);
+      const b = 0.34 + 0.32 * breathe + g * 0.5;
       col[i * 3 + 0] = c.r * b;
       col[i * 3 + 1] = c.g * b;
       col[i * 3 + 2] = c.b * b;

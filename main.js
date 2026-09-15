@@ -9,6 +9,7 @@ import { stations } from './stations.js';
 import { HallScene } from './sceneSystem.js';
 import { ParticleEngine } from './particleEngine.js';
 import { makePlacardTexture, ensureFonts } from './placardText.js';
+import { createHand } from './hand.js';
 
 // ---- Renderer ----
 const container = document.getElementById('scene');
@@ -43,6 +44,17 @@ async function bakeLabels() {
   });
 }
 bakeLabels();
+
+// Station 1 exhibit: the hand reaching up into the mass of latent potential.
+const cc0 = hall.cloudCenter(0);
+const { group: handGroup, reachPoint: handReachLocal } = createHand();
+handGroup.scale.setScalar(1.3);
+handGroup.rotation.x = -1.35;          // tilt fingers up, palm toward the visitor
+handGroup.position.set(0, cc0.y - 0.95, cc0.z + 0.15);
+scene.add(handGroup);
+handGroup.updateMatrixWorld(true);
+// Hand the fingertip world position to station 0's particle system.
+engine.systems[0].reachPoint = handReachLocal.clone().applyMatrix4(handGroup.matrixWorld);
 
 // ---- Navigation state ----
 let current = 0;

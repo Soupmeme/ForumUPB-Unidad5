@@ -18,9 +18,9 @@
 export const stations = [
   {
     slide: 1,
-    state: 'placeholder',
-    intensity: 0.55,
-    accent: 0.0,
+    state: 'latent-reach',
+    intensity: 0.6,
+    accent: 0.05,
     handle: '@centrodeeventosupb',
     text: [
       { t: 'RELEVO GENERACIONAL', em: true },

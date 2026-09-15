@@ -59,6 +59,17 @@ El latido es una gaussiana viajera en el parametro a lo largo del pasillo: donde
 ### D9 — Tipografia: Space Grotesk (grotesca moderna), vendorizada
 Kiwi pidio una tipografia acorde a una expo academica/de industria; la sans por defecto del navegador se veia demasiado simple. Direccion elegida: grotesca moderna, todo en una sola familia para mantener coherencia. Se usa Space Grotesk (fuente variable, peso 300 a 700) en placas y cromo. Se guarda localmente en `fonts/` (subconjunto latino, cubre acentos y ¿) para conservar el modo sin conexion. El canvas de las placas espera a que la fuente cargue (`ensureFonts`) antes de hornear las texturas, si no usaria una fuente de reemplazo. Peso normal 400 (el 300 quedaba muy delgado a distancia), enfasis 700 en ambar.
 
+### D11 — Estacion 1 autorada: una mano que alcanza una masa de potencial latente
+Concepto de Kiwi para la tesis ("Relevo generacional: la ventaja que nadie esta aprovechando"): explicito + abstracto. Una mano que se extiende hacia una masa de particulas que late suavemente, significando el potencial que espera ser alcanzado. Lectura: la masa es el potencial latente (late como un respiro contenido); la mano es el acto de alcanzarlo, de tomar la ventaja que nadie toma. El momento de contacto es la charla entera en miniatura.
+
+Implementacion:
+- `hand.js`: una mano procedural estilizada, autorada directamente en Three.js desde la foto de referencia (palma como elipsoide achatado, cuatro dedos y pulgar como tubos curvados que se curvan hacia arriba, muneca hacia el plinto). Gesto abierto, ligeramente ahuecado, alcanzando hacia arriba.
+- Nuevo estado del motor `latent-reach` en `particleEngine.js`: la masa respira lento; donde entran las yemas (sys.reachPoint, en el mundo) las particulas mas cercanas se levantan hacia los dedos y brillan hacia un blanco calido (emergence = el potencial siendo alcanzado).
+- La mano se coloca en la estacion 1 en `main.js`, sube hacia la masa desde detras de la placa; su reachPoint (centroide de las yemas) se pasa al sistema de particulas de la estacion 0.
+
+### D12 — Herramienta: img2threejs instalado, pero autoria directa para la mano
+Se instalo Python 3.12 e img2threejs (la herramienta que menciona el handoff). Corre de punta a punta aqui: se autoro una especificacion completa de la mano (palma, dedos, pulgar, material de piel, evidencia PBR, iluminacion) que PASO la validacion estricta y genero una fabrica de Three.js. Pero img2threejs construye pase por pase (blockout -> estructura -> forma -> material -> iluminacion) y cada pase esta bloqueado detras de un bucle de revision (render + hoja comparativa + diferencia interior + puntaje de vision + revision registrada). Llegar a una mano terminada exige recorrer ese circuito varias veces, y emite TypeScript que hay que empaquetar para nuestro proyecto de JS plano. Kiwi eligio, con ese costo a la vista, que yo autorara la mano directamente en Three.js reutilizando todo el analisis. La herramienta queda instalada por si se quiere para props mas simples (un marco, una luminaria) mas adelante.
+
 ## Lo que NO se importa del referente (recordatorio permanente)
 La espiral como ancla estable, la metáfora de órbita/comunidad, los nombres y valores de los parámetros de comportamiento del profesor (spiral/network/architecture/archive/stability), el formato de lienzo 2D a sangre completa, y la paleta cian/rojo/magenta ligada al branding de ese evento.
 
