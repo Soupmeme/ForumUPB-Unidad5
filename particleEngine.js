@@ -846,92 +846,92 @@ const handlers = {
     }
   },
 
-  // Station 7, take two: "El talento crece a la velocidad de la confianza."
-  // The single orb-weaver web (D27) was a strong structure but told no one's
-  // story on its own. Kiwi's redirect: both generations each coalesce into
-  // their OWN similar web -- looser than the crystalline version, real
-  // cohesion without being a technical diagram -- and the two breathe
-  // together on one tiny, shared pulse. The synchronization IS the trust:
-  // they don't have to touch to resonate as one. This ties station 7 back
-  // into the elder/young thread from stations 1 and 6, which the single-web
-  // version didn't.
+  // Station 7, take three: "El talento crece a la velocidad de la confianza."
+  // Kiwi's correction: not two separate webs pulsating in sync (that read as
+  // "side by side", not "together") -- ONE single structure that both
+  // generations coalesce into. That coalescing IS the entire premise of
+  // trust. So: one shared web, spokes alternating amber/jade (interwoven,
+  // not split left/right), each thread fading from its generation's color
+  // at the rim toward `hot` at the hub -- the closer to the shared center,
+  // the more merged; the further out, the more each side's own identity
+  // still shows. The rings (which cross alternating spokes) pick up both
+  // colors naturally via per-vertex gradients, reading as literally woven
+  // together.
   'trust-grows'(sys, elapsed) {
     const pos = sys.points.geometry.attributes.position.array;
     const col = sys.points.geometry.attributes.color.array;
     const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
     const e = sys.params.energy;
+    const c = new THREE.Color();
 
     if (!sys._trustSetup) {
       sys._trustSetup = true;
-      const half = sys.n >> 1;
-      const spokes = 15, shells = 12; // 15*12 = half exactly -- one web per generation
-      sys._trustHalf = half;
+      const spokes = 30, shells = 12; // 30*12 = sys.n exactly -- one shared web
       sys._trustSpokes = spokes;
       sys._trustShells = shells;
-      const idxOf = (side, spoke, shell) => (side === 0 ? 0 : half) + shell * spokes + spoke;
+      sys._trustSpokeGen = Array.from({ length: spokes }, (_, s) => s % 2); // alternating: 0=elder, 1=young
+      const idx = (spoke, shell) => shell * spokes + spoke;
 
-      const bonds = []; // [a, b, side] -- straight, not curved
-      for (let side = 0; side < 2; side++) {
-        for (let s = 0; s < spokes; s++) bonds.push([idxOf(side, s, 0), idxOf(side, s, shells - 1), side]);
-        for (const ringShell of [3, shells - 1]) { // fewer rings than D27 -- looser, less crystalline
-          for (let s = 0; s < spokes; s++) bonds.push([idxOf(side, s, ringShell), idxOf(side, (s + 1) % spokes, ringShell), side]);
-        }
+      const bonds = []; // [a, b] -- straight; color comes from each vertex's own spoke
+      for (let s = 0; s < spokes; s++) bonds.push([idx(s, 0), idx(s, shells - 1)]);
+      for (const ringShell of [3, 7, shells - 1]) {
+        for (let s = 0; s < spokes; s++) bonds.push([idx(s, ringShell), idx((s + 1) % spokes, ringShell)]);
       }
       sys._trustBonds = bonds;
       sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
     }
 
-    const half = sys._trustHalf, spokes = sys._trustSpokes, shells = sys._trustShells;
+    const spokes = sys._trustSpokes, shells = sys._trustShells, spokeGen = sys._trustSpokeGen;
     const t = sys.activeTime;
     const growth = smoothstep(0.3, 5.5, t); // grows once, measured, then holds
-    const baseRadius = config.station.cloudRadius * 0.36; // smaller per-side web
+    const baseRadius = config.station.cloudRadius * 0.5;
     const grownRadius = baseRadius * (0.15 + growth * 0.95);
-    const domeDepth = 0.4;
-    const gapHalf = 1.5; // elder left, young right -- same convention as station 1
+    const domeDepth = 0.5;
 
     const rot = elapsed * 0.05;
-    // One shared, tiny pulse -- both generations breathe together, not each
-    // on their own rhythm. Small amplitude on purpose: a heartbeat, not a
-    // breath.
-    const heartbeat = 1 + 0.035 * Math.sin(elapsed * 1.1);
+    const heartbeat = 1 + 0.035 * Math.sin(elapsed * 1.1); // tiny, shared -- one structure, one pulse
     const pulse = 0.9 + 0.1 * Math.sin(elapsed * 1.1);
 
+    // Color at a point along a spoke: fades from `hot` at the hub (fully
+    // merged) to that spoke's own generation color at the rim (still
+    // recognizably theirs) -- the coalescing rendered as a literal gradient.
+    const colorAt = (spoke, shellFrac, out) => {
+      const gen = spokeGen[spoke] === 0 ? elder : young;
+      out.copy(hot).lerp(gen, shellFrac);
+    };
+
     for (let i = 0; i < sys.n; i++) {
-      const side = i < half ? 0 : 1;
-      const local = side === 0 ? i : i - half;
-      const spoke = local % spokes, shell = Math.floor(local / spokes) % shells;
+      const spoke = i % spokes, shell = Math.floor(i / spokes) % shells;
       const shellFrac = (shell + 1) / shells;
 
-      // A little organic jitter per particle: real cohesion, not a ruler-
-      // straight technical diagram.
-      const rJit = 1 + (sys.baseR[i] - 0.7) * 0.06;
+      const rJit = 1 + (sys.baseR[i] - 0.7) * 0.06; // organic, not ruler-straight
       const aJit = (sys.phase[i] - Math.PI) * 0.01;
       const angle = (spoke / spokes) * Math.PI * 2 + rot + aJit;
       const r = grownRadius * shellFrac * heartbeat * rJit;
 
-      const sideSign = side === 0 ? -1 : 1;
-      pos[i * 3 + 0] = cx + sideSign * gapHalf + Math.cos(angle) * r;
+      pos[i * 3 + 0] = cx + Math.cos(angle) * r;
       pos[i * 3 + 1] = cy + Math.sin(angle) * r;
       pos[i * 3 + 2] = cz + domeDepth * (1 - shellFrac) * growth;
 
-      const tint = side === 0 ? elder : young;
-      const b = (0.32 + e * 0.28) * pulse * (0.7 + 0.3 * (1 - shellFrac));
-      col[i * 3 + 0] = tint.r * b;
-      col[i * 3 + 1] = tint.g * b;
-      col[i * 3 + 2] = tint.b * b;
+      colorAt(spoke, shellFrac, c);
+      const b = (0.32 + e * 0.28) * pulse;
+      col[i * 3 + 0] = c.r * b;
+      col[i * 3 + 1] = c.g * b;
+      col[i * 3 + 2] = c.b * b;
     }
 
     const bpos = sys.bonds.geometry.attributes.position.array;
     const bcol = sys.bonds.geometry.attributes.color.array;
     const v = (0.16 + growth * 0.2) * pulse;
     let k = 0;
-    for (const [a, b, side] of sys._trustBonds) {
+    for (const [a, b] of sys._trustBonds) {
       const p0 = k * 6, p1 = k * 6 + 3; k++;
       bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
       bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
-      const tint = side === 0 ? elder : young;
-      bcol[p0 + 0] = tint.r * v; bcol[p0 + 1] = tint.g * v; bcol[p0 + 2] = tint.b * v;
-      bcol[p1 + 0] = tint.r * v; bcol[p1 + 1] = tint.g * v; bcol[p1 + 2] = tint.b * v;
+      colorAt(a % spokes, (Math.floor(a / spokes) % shells + 1) / shells, c);
+      bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
+      colorAt(b % spokes, (Math.floor(b / spokes) % shells + 1) / shells, c);
+      bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
     }
   },
 };
