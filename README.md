@@ -33,6 +33,12 @@ Contenido y render están desacoplados (esa separación es lo que obliga a que t
 - `particleEngine.js` — el motor compartido: un sistema de partículas por estación que suaviza sus parámetros hacia los objetivos del momento, con un despachador de manejadores por `state`.
 - `main.js` — cableado del DOM: navegación, sincronización del HUD, bucle de animación.
 
+## Créditos
+
+- Modelo de la mano (Estación 1): "Low poly hands" por Anastasiia Ku, licencia CC-BY, vía [Poly Pizza](https://poly.pizza/m/cGaYRuiPCMe). `assets/hand.glb`.
+- Tipografía: Space Grotesk (SIL Open Font License).
+- Three.js (MIT), vendorizado en `vendor/`.
+
 ## Estado
 
 Shell funcional de punta a punta con arte de partículas genérico ("placeholder") en las 13 estaciones. La autoría del sistema de partículas propio de cada estación es la siguiente fase, iterativa.
