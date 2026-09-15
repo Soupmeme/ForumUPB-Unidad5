@@ -289,6 +289,92 @@ const handlers = {
       bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;
     }
   },
+
+  // Station 2: "un gran auditorio solo para hacer grados?" -- a doubtful
+  // question about a space reduced to one narrow use. The particles sit in a
+  // rigid, orderly grid (rows and columns, like fixed seating), boxed by a
+  // wireframe that marks its own boundary. High cohesion, near-zero
+  // dispersion: nothing reaches past the edge, nothing leaves the block.
+  // Almost no motion -- rigidity itself is the point. This is what the next
+  // station's "decidio encontrarse con el mundo" breaks open.
+  'auditorium-lattice'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+
+    // One-time grid layout: rows/cols/layers close to sys.n, plus the fixed
+    // real-particle indices used for the boundary wireframe and row/column
+    // dividers. Computed once, reused every frame.
+    if (!sys._latticeSetup) {
+      sys._latticeSetup = true;
+      const cols = 10, layers = 3;
+      const rows = Math.max(2, Math.floor(sys.n / (cols * layers)));
+      sys._lat = { cols, rows, layers };
+      const idx = (u, v, w) => w * rows * cols + v * cols + u;
+
+      const bonds = [];
+      const uMax = cols - 1, vMax = rows - 1, wMax = layers - 1;
+      // Box edges: the literal boundary of the space, nothing crosses it.
+      for (const [v, w] of [[0, 0], [vMax, 0], [0, wMax], [vMax, wMax]]) bonds.push([idx(0, v, w), idx(uMax, v, w), 'edge']);
+      for (const [u, w] of [[0, 0], [uMax, 0], [0, wMax], [uMax, wMax]]) bonds.push([idx(u, 0, w), idx(u, vMax, w), 'edge']);
+      for (const [u, v] of [[0, 0], [uMax, 0], [0, vMax], [uMax, vMax]]) bonds.push([idx(u, v, 0), idx(u, v, wMax), 'edge']);
+      // Row dividers (front and back face): the rows of fixed seating.
+      for (const f of [0.25, 0.5, 0.75]) {
+        const v = Math.round(vMax * f);
+        bonds.push([idx(0, v, 0), idx(uMax, v, 0), 'row']);
+        bonds.push([idx(0, v, wMax), idx(uMax, v, wMax), 'row']);
+      }
+      // A couple of aisle-like column dividers on the front face.
+      for (const f of [0.33, 0.66]) {
+        const u = Math.round(uMax * f);
+        bonds.push([idx(u, 0, 0), idx(u, vMax, 0), 'row']);
+      }
+      sys._latticeBonds = bonds;
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
+    }
+
+    const { cols, rows, layers } = sys._lat;
+    const capacity = cols * rows * layers;
+    const width = 2.2, height = 1.8, depth = 0.7;
+    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
+    // A single slow, synchronized hum -- everyone lit the same way, unlike
+    // station 1's individually-phased particles. Institutional, not alive.
+    const hum = 0.92 + 0.08 * Math.sin(elapsed * 0.6);
+
+    for (let i = 0; i < sys.n; i++) {
+      const g = Math.min(i, capacity - 1);
+      const u = g % cols;
+      const v = Math.floor(g / cols) % rows;
+      const w = Math.floor(g / (cols * rows)) % layers;
+
+      const jitter = Math.sin(elapsed * 0.5 + sys.phase[i]) * 0.015; // barely alive
+      const px = cx + (u / (cols - 1) - 0.5) * width + jitter;
+      const py = cy + (v / (rows - 1) - 0.5) * height;
+      const pz = cz + (layers > 1 ? (w / (layers - 1) - 0.5) * depth : 0) + jitter * 0.6;
+
+      pos[i * 3 + 0] = px;
+      pos[i * 3 + 1] = py;
+      pos[i * 3 + 2] = pz;
+
+      const b = (0.34 + e * 0.24) * hum;
+      col[i * 3 + 0] = base.r * b;
+      col[i * 3 + 1] = base.g * b;
+      col[i * 3 + 2] = base.b * b;
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let k = 0; k < sys._latticeBonds.length; k++) {
+      const [a, b, kind] = sys._latticeBonds[k];
+      const p0 = k * 6, p1 = k * 6 + 3;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const v = (kind === 'edge' ? 0.3 : 0.16) * hum;
+      bcol[p0 + 0] = base.r * v; bcol[p0 + 1] = base.g * v; bcol[p0 + 2] = base.b * v;
+      bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
+    }
+  },
 };
 
 export class ParticleEngine {

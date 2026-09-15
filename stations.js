@@ -29,7 +29,7 @@ export const stations = [
   },
   {
     slide: 2,
-    state: 'placeholder',
+    state: 'auditorium-lattice',
     intensity: 0.30,
     accent: 0.15,
     photo: 1,
