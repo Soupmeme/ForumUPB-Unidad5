@@ -747,87 +747,98 @@ const handlers = {
     }
   },
 
-  // Station 6: "Un evento trae personas. Una comunidad trae transformacion."
-  // Studied from the referente's own "community" state (motion-study.md
-  // #2): a compact, tight mass held together by a real number of bonds that
-  // curve inward toward a shared center -- a huddle -- deliberately the
-  // opposite texture of the wide, straight bonds "confianza" (next station)
-  // will need. First station with actual CURVED bonds (multi-segment, bowed
-  // toward center), not straight lines.
+  // Station 6, take two: "Un evento trae personas. Una comunidad trae
+  // transformacion." Kiwi's own concept, replacing the single-blended-mass
+  // version (which read as togetherness but not transformation): the elder
+  // and young masses continuously exchange members THROUGH a third,
+  // indeterminate middle space -- visualizing transformation as the direct
+  // product of their interaction, not just their proximity. This DOES bring
+  // the two-generation visual back (unlike the prior version's caution about
+  // pre-empting station 9), because the point here is specifically the
+  // MECHANISM of exchange, not the reveal that two generations exist.
   //
-  // Color: the text pivots from the institution (stations 2-5) to people --
-  // but the script doesn't name the two generations explicitly again until
-  // station 9 ("una vision, dos generaciones"), and the referente keeps that
-  // reveal as its own separate, bespoke technique, distinct from this
-  // "community" state. So here: ONE single cohesive mass (not two groups)
-  // in a blended elder+young hue -- ties to the generational thread without
-  // spending station 9's two-part reveal three stations early.
-  'community-huddle'(sys, elapsed) {
+  // Every particle runs its own perpetual cycle: dwell with its home
+  // generation, cross through the middle (changing color toward `hot` --
+  // reused deliberately, since it already means "something new emerging" at
+  // stations 1 and 5), dwell with the other generation, cross back. Colors
+  // and positions are literally the same computation, so nothing is
+  // decorative -- the crossing IS the transformation.
+  'community-exchange'(sys, elapsed) {
     const pos = sys.points.geometry.attributes.position.array;
     const col = sys.points.geometry.attributes.color.array;
     const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
     const e = sys.params.energy;
+    const c = new THREE.Color();
 
-    if (!sys._huddleSetup) {
-      sys._huddleSetup = true;
-      const bonds = [];
-      for (let k = 0; k < 26; k++) {
-        const a = (k * 13) % sys.n, b = (k * 13 + 37) % sys.n;
-        if (a !== b) bonds.push([a, b]);
-      }
-      sys._huddleBonds = bonds;
-      sys._huddleSegs = 5; // sub-segments per curve
-      sys.bonds.geometry.setDrawRange(0, bonds.length * sys._huddleSegs * 2);
+    if (!sys._exchangeSetup) {
+      sys._exchangeSetup = true;
+      const trailCount = 18;
+      const trails = [];
+      for (let k = 0; k < trailCount; k++) trails.push(Math.floor((k / trailCount) * sys.n));
+      sys._exchangeTrails = trails;
+      sys.bonds.geometry.setDrawRange(0, trails.length * 2);
     }
 
-    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
-    const clusterRadius = config.station.cloudRadius * 0.62; // tighter than a placeholder cloud: a huddle
-    const rot = elapsed * 0.09; // slow, settled -- not searching, not reaching
-    const cs = Math.cos(rot), sn = Math.sin(rot);
-    const breathe = 0.5 + 0.5 * Math.sin(elapsed * 0.7);
+    const gapHalf = 1.6;
+    const localR = config.station.cloudRadius * 0.34;
+    const cycleLen = 9.0; // seconds for one full round trip: elder -> middle -> young -> middle -> elder
+
+    // A position in [-1, 0, 1, 0] over one cycle, easing to a stop at each
+    // waypoint (smoothstep has zero slope at both ends of each quarter) --
+    // so particles genuinely DWELL at each generation and at the middle,
+    // rather than just passing through at constant speed.
+    const wave4 = (phaseFrac) => {
+      const q = phaseFrac * 4;
+      const qi = Math.floor(q) % 4;
+      const qf = q - Math.floor(q);
+      const waypoints = [-1, 0, 1, 0];
+      const nextpoints = [0, 1, 0, -1];
+      const local = smoothstep(0, 1, qf);
+      return waypoints[qi] + (nextpoints[qi] - waypoints[qi]) * local;
+    };
+    const sidePosOf = (i, atTime) => {
+      const phaseOffset = sys.phase[i] / (Math.PI * 2);
+      const phaseFrac = ((atTime / cycleLen) + phaseOffset) % 1;
+      return wave4(phaseFrac);
+    };
+    const colorAt = (sidePos, target) => {
+      if (sidePos <= 0) target.copy(hot).lerp(elder, -sidePos);
+      else target.copy(hot).lerp(young, sidePos);
+    };
 
     for (let i = 0; i < sys.n; i++) {
+      const sidePos = sidePosOf(i, elapsed);
       const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
-      const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
-      const r = clusterRadius * sys.baseR[i] * (0.6 + 0.18 * breathe + e * 0.1);
-      pos[i * 3 + 0] = cx + rx * r;
+      const r = localR * sys.baseR[i] * (0.75 + e * 0.15);
+      pos[i * 3 + 0] = cx + sidePos * gapHalf + dx * r;
       pos[i * 3 + 1] = cy + dy * r;
-      pos[i * 3 + 2] = cz + rz * r;
+      pos[i * 3 + 2] = cz + dz * r;
 
-      const b = 0.34 + e * 0.3 + breathe * 0.08;
-      col[i * 3 + 0] = base.r * b;
-      col[i * 3 + 1] = base.g * b;
-      col[i * 3 + 2] = base.b * b;
+      colorAt(sidePos, c);
+      const b = 0.36 + e * 0.3;
+      col[i * 3 + 0] = c.r * b;
+      col[i * 3 + 1] = c.g * b;
+      col[i * 3 + 2] = c.b * b;
     }
 
-    // Curved bonds: each bows toward the shared center -- the huddle's
-    // defining texture (motion-study #2/#4), not a straight connector.
+    // A few particles carry a visible trail (station 5's technique): the
+    // crossing reads as directed motion, not a random flicker between poles.
     const bpos = sys.bonds.geometry.attributes.position.array;
     const bcol = sys.bonds.geometry.attributes.color.array;
-    const segs = sys._huddleSegs;
-    const pull = 0.4; // how strongly the curve bows toward center
-    const pulse = 0.5 + 0.5 * Math.sin(elapsed * 0.6);
+    const trailBack = 0.4; // seconds
     let k = 0;
-    for (const [a, b] of sys._huddleBonds) {
-      const ax = pos[a * 3 + 0], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
-      const bx = pos[b * 3 + 0], by = pos[b * 3 + 1], bz = pos[b * 3 + 2];
-      const mx = (ax + bx) / 2, my = (ay + by) / 2, mz = (az + bz) / 2;
-      const ctrlX = mx + (cx - mx) * pull, ctrlY = my + (cy - my) * pull, ctrlZ = mz + (cz - mz) * pull;
-      const v = (0.14 + 0.08 * pulse);
-
-      let px0 = ax, py0 = ay, pz0 = az;
-      for (let s = 1; s <= segs; s++) {
-        const t = s / segs;
-        const px1 = quadPoint(ax, ctrlX, bx, t);
-        const py1 = quadPoint(ay, ctrlY, by, t);
-        const pz1 = quadPoint(az, ctrlZ, bz, t);
-        const p0 = k * 6, p1 = k * 6 + 3; k++;
-        bpos[p0 + 0] = px0; bpos[p0 + 1] = py0; bpos[p0 + 2] = pz0;
-        bpos[p1 + 0] = px1; bpos[p1 + 1] = py1; bpos[p1 + 2] = pz1;
-        bcol[p0 + 0] = base.r * v; bcol[p0 + 1] = base.g * v; bcol[p0 + 2] = base.b * v;
-        bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
-        px0 = px1; py0 = py1; pz0 = pz1;
-      }
+    for (const i of sys._exchangeTrails) {
+      const sidePos = sidePosOf(i, elapsed);
+      const sidePosBack = sidePosOf(i, elapsed - trailBack);
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const r = localR * sys.baseR[i] * 0.85;
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = cx + sidePos * gapHalf + dx * r; bpos[p0 + 1] = cy + dy * r; bpos[p0 + 2] = cz + dz * r;
+      bpos[p1 + 0] = cx + sidePosBack * gapHalf + dx * r; bpos[p1 + 1] = cy + dy * r; bpos[p1 + 2] = cz + dz * r;
+      colorAt(sidePos, c);
+      const v = 0.24;
+      bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
+      bcol[p1 + 0] = c.r * v * 0.25; bcol[p1 + 1] = c.g * v * 0.25; bcol[p1 + 2] = c.b * v * 0.25;
     }
   },
 };
