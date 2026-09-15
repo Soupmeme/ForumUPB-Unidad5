@@ -14,6 +14,7 @@ import { config } from './config.js';
 
 const elder = new THREE.Color(config.palette.accentElder);
 const young = new THREE.Color(config.palette.accentYoung);
+const institution = new THREE.Color(config.palette.accentInstitution);
 const hot = new THREE.Color(0xfff2d0);
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -346,7 +347,9 @@ const handlers = {
     const { cols, rows, layers } = sys._lat;
     const capacity = cols * rows * layers;
     const width = 2.2, height = 1.8, depth = 0.7;
-    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
+    // This IS the institution (the auditorium itself), not a generation --
+    // uses the institution color, not the elder/young gradient (D19).
+    const base = institution;
     // A single slow, synchronized hum -- everyone lit the same way, unlike
     // station 1's individually-phased particles. Institutional, not alive.
     const hum = 0.92 + 0.08 * Math.sin(elapsed * 0.6);
@@ -427,7 +430,9 @@ const handlers = {
     const openness = smoothstep(0.8, 3.6, sys.activeTime);
 
     const gw = 1.1, gh = 0.9, gd = 0.35; // half station 2's box: an echo, not the centerpiece
-    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
+    // Still the institution (la Universidad), opening itself -- not yet the
+    // generations meeting it. Stays institution-colored throughout (D19).
+    const base = institution;
     const rot = elapsed * 0.05; // the open field drifts slowly, calmly
     const cs = Math.cos(rot), sn = Math.sin(rot);
 

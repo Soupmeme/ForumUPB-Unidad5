@@ -54,15 +54,18 @@ export const config = {
   },
 
   // ---- Palette (ours, decision: NOT the referente's cyan/red/magenta) ----
-  // Warm bone architecture on a dark ground; two generational accents that
-  // hand off along the hall (amber = experience, jade = new generations).
+  // Warm bone architecture on a dark ground. Three named actors, each with
+  // its own color, identifiable across the whole walk (D19): amber = elder
+  // generation, jade = young generation, indigo = the institution itself
+  // (Forum/University/the space as an actor, not a generation).
   palette: {
     background: 0x0e1116,
     fog: 0x0e1116,
-    architecture: 0xe9e2d0, // bone stone for floor/walls/pillars
-    placardFrame: 0x6e5a3a, // bronze
-    accentElder: 0xf2b705,  // amber / gold
-    accentYoung: 0x37b9a0,  // jade / teal
+    architecture: 0xe9e2d0,    // bone stone for floor/walls/pillars
+    placardFrame: 0x6e5a3a,    // bronze
+    accentElder: 0xf2b705,     // amber / gold -- elder generation
+    accentYoung: 0x37b9a0,     // jade / teal -- young generation
+    accentInstitution: 0x8a7fd9, // indigo / violet -- the institution (Forum/University), not a generation
     lightKey: 0xfff4dd,
     lightFill: 0x9fb4c8,
   },
