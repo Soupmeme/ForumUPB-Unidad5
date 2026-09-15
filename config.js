@@ -29,7 +29,7 @@ export const config = {
     cloudRadius: 1.9,      // base radius of a station's particle cloud
     pointSize: 0.075,
     idleIntensity: 0.22,   // energy of non-active stations (still visible, calmer)
-    bondsMax: 64,          // max fixed-pair relationship lines a station's bonds buffer can hold
+    bondsMax: 80,          // max fixed-pair relationship lines a station's bonds buffer can hold
   },
 
   // ---- Migrating-particle thread: a pulsing double helix (throughline, D2 / D10) ----

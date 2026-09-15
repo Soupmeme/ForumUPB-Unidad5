@@ -143,8 +143,10 @@ const handlers = {
   //    turbulent (still finding its shape).
   //  - explicit "bonds" (#2/#3): a dense fixed lattice inside the elder mass
   //    (established structure), a few loose bonds inside the young mass, and
-  //    a handful of bridge attempts between the two that flicker and never
-  //    fully connect -- the relationship itself is drawn, not implied.
+  //    a handful of independent tendrils growing from each mass toward the
+  //    middle -- each one capped short of the center, so the two sides are
+  //    always visibly reaching, never touching (neither generation yet knows
+  //    it could close that gap).
   //  - the reach is a three-act envelope (#6: build -> reach -> retreat)
   //    over a fixed cycle, not a continuous sine.
   'twin-reach'(sys, elapsed) {
@@ -170,7 +172,7 @@ const handlers = {
       const innerRight = innermost(half, sys.n, 1);
 
       const pairs = [];
-      const denseCount = 42, sparseCount = 9, bridgeCount = 7;
+      const denseCount = 42, sparseCount = 9, tendrilsPerSide = 8;
       for (let k = 0; k < denseCount; k++) {
         const a = (k * 7) % half, b = (k * 7 + 17) % half;
         if (a !== b) pairs.push([a, b, 'elder']);
@@ -180,9 +182,11 @@ const handlers = {
         const a = half + (k * 13) % span, b = half + (k * 13 + 31) % span;
         if (a !== b) pairs.push([a, b, 'young']);
       }
-      for (let k = 0; k < bridgeCount; k++) {
-        pairs.push([innerLeft[k % innerLeft.length], innerRight[(k * 3) % innerRight.length], 'bridge']);
-      }
+      // Bridge attempts: independent tendrils, one per anchor, each growing
+      // from ITS OWN mass toward the middle. Not a line between two particles
+      // -- each stops on its own, so the two sides visibly never meet.
+      for (let k = 0; k < tendrilsPerSide; k++) pairs.push([innerLeft[k % innerLeft.length], -1, 'bridge']);
+      for (let k = 0; k < tendrilsPerSide; k++) pairs.push([innerRight[k % innerRight.length], 1, 'bridge']);
       sys._twinBonds = pairs;
       sys.bonds.geometry.setDrawRange(0, pairs.length * 2);
     }
@@ -240,9 +244,33 @@ const handlers = {
     // Bonds: read this frame's already-updated particle positions.
     const bpos = sys.bonds.geometry.attributes.position.array;
     const bcol = sys.bonds.geometry.attributes.color.array;
+    const maxTendril = 0.55; // how far a bridge attempt can grow -- well short of the middle
     for (let k = 0; k < sys._twinBonds.length; k++) {
       const [a, b, kind] = sys._twinBonds[k];
       const p0 = k * 6, p1 = k * 6 + 3;
+
+      if (kind === 'bridge') {
+        // A single tendril growing from ITS OWN particle toward the middle,
+        // capped short of the true center -- never a line to the other side.
+        const side = b; // repurposed: -1 (grows from elder) or 1 (grows from young)
+        const ax = pos[a * 3 + 0], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
+        const dirSign = -side; // elder reaches toward +x, young toward -x
+        const avail = Math.max(0, (cx - ax) * dirSign);
+        const travel = Math.min(reachEnvelope * maxTendril, avail);
+        bpos[p0 + 0] = ax; bpos[p0 + 1] = ay; bpos[p0 + 2] = az;
+        bpos[p1 + 0] = ax + dirSign * travel; bpos[p1 + 1] = ay; bpos[p1 + 2] = az;
+
+        const flick = Math.max(0, Math.sin(elapsed * 2.6 + k * 1.7) - 0.35);
+        const v = Math.min(0.42, reachEnvelope * flick * 1.7);
+        c.copy(side < 0 ? elder : young).lerp(hot, 0.55);
+        const br = c.r * v, bgc = c.g * v, bb = c.b * v;
+        // Dim at the anchor (still part of the mass), brighter at the tip
+        // (the reaching edge, glimpsed and gone).
+        bcol[p0 + 0] = br * 0.35; bcol[p0 + 1] = bgc * 0.35; bcol[p0 + 2] = bb * 0.35;
+        bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;
+        continue;
+      }
+
       bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
       bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
 
@@ -251,18 +279,11 @@ const handlers = {
         // A dense, quietly-present lattice: established, doesn't flicker.
         const v = 0.16 + 0.08 * breatheL;
         br = elder.r * v; bgc = elder.g * v; bb = elder.b * v;
-      } else if (kind === 'young') {
+      } else {
         // A few loose bonds that shimmer: still forming its own shape.
         const flick = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * 1.6 + k));
         const v = 0.1 + 0.14 * flick;
         br = young.r * v; bgc = young.g * v; bb = young.b * v;
-      } else {
-        // Bridge attempts: flicker in and out, capped low -- the connection
-        // is tried, glimpsed, but never allowed to fully solidify.
-        const flick = Math.max(0, Math.sin(elapsed * 2.6 + k * 1.7) - 0.35);
-        const v = Math.min(0.45, reachEnvelope * flick * 1.7);
-        c.copy(elder).lerp(young, 0.5).lerp(hot, 0.5);
-        br = c.r * v; bgc = c.g * v; bb = c.b * v;
       }
       bcol[p0 + 0] = br; bcol[p0 + 1] = bgc; bcol[p0 + 2] = bb;
       bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;

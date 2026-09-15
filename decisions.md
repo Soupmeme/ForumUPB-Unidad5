@@ -79,6 +79,11 @@ Kiwi senalo que las venas helicoidales de las paredes (D10) a veces se perdian d
 ### D15 — Flechas arriba/abajo: arriba avanza, abajo vuelve
 Kiwi senalo que la asociacion estaba invertida (abajo avanzaba, arriba volvia). Se corrige en `main.js`: ArrowUp/PageUp avanzan junto con Espacio/ArrowRight; ArrowDown/PageDown vuelven junto con ArrowLeft. El texto de ayuda en pantalla no menciona arriba/abajo (solo Espacio/flechas laterales), asi que no necesito actualizarlo.
 
+### D16 — Los puentes ya no se tocan: cada lado alcanza por su cuenta y se queda corto
+Kiwi noto que el "puente" anterior era una sola linea entre una particula de cada masa: aunque ambos extremos se acercaban, la linea siempre conectaba un lado con el otro por completo. La lectura que Kiwi busca es otra: en esta etapa del discurso, ninguna generacion sabe todavia que puede alcanzar a la otra, asi que las lineas deben tratar de llegar y quedarse cortas, sin tocarse.
+
+Se rehace en `particleEngine.js`: cada intento de puente ahora es un zarcillo INDEPENDIENTE que crece desde una sola particula (ancla) hacia el centro, con una distancia maxima fija (`maxTendril`) y ademas limitado a nunca pasar la linea central real. Los zarcillos de la masa mayor crecen hacia la derecha; los de la joven, hacia la izquierda; ninguno de los dos alcanza el medio, y no hay ninguna linea que una una particula de un lado con una del otro. El extremo (la punta que alcanza) brilla mas que el anclaje (que sigue siendo parte de la masa), reforzando que es un intento, no una conexion lograda.
+
 ## Lo que NO se importa del referente (recordatorio permanente)
 La espiral como ancla estable, la metáfora de órbita/comunidad, los nombres y valores de los parámetros de comportamiento del profesor (spiral/network/architecture/archive/stability), el formato de lienzo 2D a sangre completa, y la paleta cian/rojo/magenta ligada al branding de ese evento.
 
