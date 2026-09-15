@@ -43,7 +43,7 @@ export class HallScene {
 
     this._buildLights();
     this._buildHall();
-    this._buildPillars();
+    this._buildStations();
     this._buildThread();
   }
 
@@ -52,18 +52,19 @@ export class HallScene {
     return config.hall.startZ - i * config.hall.stationGap;
   }
 
-  // Center of a station's floating particle cloud (top of its pillar).
+  // Center of a station's floating particle cloud (above the plinth).
   cloudCenter(i) {
     const z = this.stationZ(i);
-    return new THREE.Vector3(0, this.floorY(z) + this.pillarHeight + 1.4, z);
+    return new THREE.Vector3(0, this.floorY(z) + this.plinthHeight + 1.6, z);
   }
 
-  // Camera stand + look target for a station.
+  // Camera stand + look target for a station. The look point sits between the
+  // label panel (below) and the particle cloud (above) so both are framed.
   stationView(i) {
     const z = this.stationZ(i);
     const standZ = z + config.camera.standBack;
     const pos = new THREE.Vector3(0, this.floorY(standZ) + config.camera.eyeHeight, standZ);
-    const look = this.cloudCenter(i);
+    const look = new THREE.Vector3(0, this.floorY(z) + 2.5, z + 0.6);
     return { pos, look };
   }
 
@@ -111,35 +112,49 @@ export class HallScene {
     }
   }
 
-  _buildPillars() {
-    this.pillarHeight = 3.2;
-    const pillarMat = new THREE.MeshStandardMaterial({ color: P.architecture, roughness: 0.8, metalness: 0.05 });
-    const frameMat = new THREE.MeshStandardMaterial({ color: P.placardFrame, roughness: 0.6, metalness: 0.3 });
-    const placardMat = new THREE.MeshStandardMaterial({ color: 0x141a20, roughness: 0.5, metalness: 0.1 });
+  _buildStations() {
+    this.plinthHeight = 2.2;
+    this.labels = []; // per-station unlit text planes; text set via setLabel()
+    const plinthMat = new THREE.MeshStandardMaterial({ color: P.architecture, roughness: 0.8, metalness: 0.05 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: P.placardFrame, roughness: 0.55, metalness: 0.35 });
 
     for (let i = 0; i < this.count; i++) {
       const z = this.stationZ(i);
       const fy = this.floorY(z);
 
-      // Pillar body.
-      const pillar = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, this.pillarHeight, 1.2),
-        pillarMat,
+      // Plinth: the plinth the exhibit (particle cloud) sits on.
+      const plinth = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, this.plinthHeight, 1.4),
+        plinthMat,
       );
-      pillar.position.set(0, fy + this.pillarHeight / 2, z);
-      this.group.add(pillar);
+      plinth.position.set(0, fy + this.plinthHeight / 2, z);
+      this.group.add(plinth);
 
-      // Placard: a tilted slab on the visitor-facing side of the pillar, a
-      // pure visual anchor. The readable text is the HUD (decision D3).
-      const placardGroup = new THREE.Group();
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.05, 0.06), placardMat);
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.85, 1.2, 0.04), frameMat);
-      frame.position.z = -0.02;
-      placardGroup.add(frame, slab);
-      placardGroup.position.set(0, fy + 1.55, z + 0.66);
-      placardGroup.rotation.x = -0.32; // tilt up toward the visitor
-      this.group.add(placardGroup);
+      // Label panel: a standing interpretive panel that CARRIES the client's
+      // words as real in-world text (decision D3, revised). Bronze frame is
+      // lit; the text plane is unlit so lighting cannot reduce contrast.
+      const panel = new THREE.Group();
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.6, 0.14), frameMat);
+      const textPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(4.2, 2.4),
+        new THREE.MeshBasicMaterial({ color: 0x0d1116 }),
+      );
+      textPlane.position.z = 0.08;
+      panel.add(frame, textPlane);
+      panel.position.set(0, fy + 1.5, z + 1.25);
+      panel.rotation.x = -0.12; // lean the top back so it faces the raised camera
+      this.group.add(panel);
+      this.labels.push(textPlane);
     }
+  }
+
+  // Apply a baked text texture to a station's label (called from main.js,
+  // which owns the script data). Keeps script text out of this file.
+  setLabel(i, texture) {
+    const m = this.labels[i].material;
+    m.map = texture;
+    m.color.set(0xffffff);
+    m.needsUpdate = true;
   }
 
   _buildThread() {

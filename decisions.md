@@ -16,8 +16,21 @@ El pasillo sube a medida que se avanza. El ascenso físico mapea "el crecimiento
 ### D2 — Hilo conductor entre estaciones: partículas migrantes
 Un flujo continuo de partículas recorre el pasillo de estación en estación. Encarna físicamente el relevo generacional como algo que fluye y se transmite, no como 13 dioramas aislados. Esto responde directamente al criterio de "una estructura de elementos relacionados". El flujo transita de un acento cálido (experiencia) a uno frío (nuevas generaciones) a lo largo del recorrido.
 
-### D3 — Texto de las placas: capa HUD en espacio de pantalla
-El texto (las palabras exactas del cliente) se dibuja como una capa HTML/CSS sincronizada con la estación activa, no como texto 3D en la geometría. Razón: la legibilidad a pantalla completa en una pantalla grande es requisito duro del rubric (criterio 1). El pilar y el marco de la placa existen en el mundo 3D como anclas visuales; el texto legible vive en el HUD.
+### D3 — Texto de las placas: capa HUD en espacio de pantalla (SUPERADA por D3-rev)
+Versión inicial: el texto se dibujaba como una capa HTML/CSS en la esquina inferior, sincronizada con la estación activa, para garantizar legibilidad (criterio 1) sin arriesgar texto 3D. El pilar y la placa quedaban como meras anclas visuales.
+
+### D3-rev — El texto vive EN la placa, como texto del mundo 3D
+Kiwi señaló la incoherencia de la versión inicial: si la placa es el dispositivo del museo para sostener las palabras, tener las palabras en una esquina tipo diapositiva (a) deja la placa como un prop vacío y (b) reimporta justo la lectura de "PowerPoint con fondo 3D" que el concepto quiere evitar.
+
+El dato que cambia el cálculo: la navegación es por saltos discretos, así que cada estación se ve desde una pose de cámara conocida y fija (distancia y ángulo controlados). La razón que justificaba el HUD (incertidumbre sobre la distancia/ángulo de lectura) casi desaparece.
+
+Decisión: las palabras exactas del cliente se hornean como textura de canvas sobre la placa de cada estación (panel interpretivo tipo museo). El plano del texto es MeshBasicMaterial (sin iluminación) con fondo oscuro horneado, para que la luz de la escena nunca reduzca el contraste (criterio 1). El marco de bronce sí recibe luz. El tamaño de fuente se reduce automáticamente para textos largos.
+
+Excepciones que siguen en pantalla (no son "texto de diapositiva", son función o navegación):
+- Los códigos QR del cierre (Slide 13): un QR sobre una placa inclinada a distancia no se puede escanear con el teléfono del público, así que se mantienen como elemento de pantalla, grande y de frente.
+- El cromo de navegación: contador de estación, barra de progreso, pista de controles y panel de ayuda.
+
+Módulos: `placardText.js` (segmentos -> textura, sin saber de qué estación se trata) y `HallScene.setLabel(i, textura)`; `main.js` conecta datos y geometría. El texto del guion sigue fuera de `sceneSystem.js` (se respeta D4).
 
 ### D4 — Arquitectura del motor: un motor compartido + manejadores por estado
 Un solo motor parametrizado lee 13 objetos de datos (uno por estación) y un despachador de "manejadores" por nombre de estado decide cómo se recolocan las partículas en cada momento. El contenido (texto del guion + parámetros de "significado") queda totalmente desacoplado del código de render. Esta separación es lo que obliga mecánicamente a cumplir la regla "todo cambio debe significar algo": no se puede añadir un efecto sin decidir primero a qué parámetro nombrado pertenece.

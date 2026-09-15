@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { stations } from './stations.js';
 import { HallScene } from './sceneSystem.js';
 import { ParticleEngine } from './particleEngine.js';
+import { makePlacardTexture } from './placardText.js';
 
 // ---- Renderer ----
 const container = document.getElementById('scene');
@@ -27,6 +28,16 @@ const camera = new THREE.PerspectiveCamera(
 
 const hall = new HallScene(scene, stations.length);
 const engine = new ParticleEngine(scene, hall, stations);
+
+// Bake each station's words onto its in-world placard (decision D3, revised).
+stations.forEach((st, i) => {
+  hall.setLabel(i, makePlacardTexture({
+    text: st.text,
+    handle: st.handle,
+    photo: st.photo,
+    closing: st.isClosing,
+  }));
+});
 
 // ---- Navigation state ----
 let current = 0;
@@ -54,9 +65,6 @@ function restart() { goTo(0); }
 
 // ---- HUD ----
 const el = {
-  text: document.getElementById('station-text'),
-  handle: document.getElementById('station-handle'),
-  photo: document.getElementById('photo-tag'),
   qr: document.getElementById('qr-block'),
   counterNum: document.getElementById('counter-num'),
   counterTotal: document.getElementById('counter-total'),
@@ -65,48 +73,14 @@ const el = {
 };
 el.counterTotal.textContent = String(stations.length);
 
-function esc(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function segmentsToHTML(segs, breakEach) {
-  return segs
-    .map((s) => (s.em ? `<strong>${esc(s.t)}</strong>` : esc(s.t)))
-    .join(breakEach ? '<br>' : '');
-}
-
+// The script text now lives on the in-world placards. The HUD keeps only
+// navigation chrome plus the scannable QR on the closing station (a QR on an
+// angled placard at distance would not scan, so it stays screen-space).
 function renderHUD(index) {
   const st = stations[index];
   el.counterNum.textContent = String(index + 1);
   el.progressFill.style.width = `${(index / (stations.length - 1)) * 100}%`;
-
-  // Photo callout tag.
-  if (st.photo) {
-    el.photo.hidden = false;
-    el.photo.textContent = `FOTO ${st.photo}`;
-  } else {
-    el.photo.hidden = true;
-  }
-
-  // Handle line (e.g. slide 1).
-  if (st.handle) {
-    el.handle.hidden = false;
-    el.handle.textContent = st.handle;
-  } else {
-    el.handle.hidden = true;
-    el.handle.textContent = '';
-  }
-
-  // Closing QR slide vs normal text.
-  if (st.isClosing) {
-    el.text.innerHTML = segmentsToHTML(st.text, true);
-    el.text.style.fontSize = 'clamp(20px, 2.4vw, 34px)';
-    el.qr.hidden = false;
-  } else {
-    el.text.innerHTML = segmentsToHTML(st.text, false);
-    el.text.style.fontSize = '';
-    el.qr.hidden = true;
-  }
+  el.qr.hidden = !st.isClosing;
 }
 renderHUD(0);
 
