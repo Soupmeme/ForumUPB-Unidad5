@@ -92,9 +92,9 @@ renderHUD(0);
 // ---- Input ----
 window.addEventListener('keydown', (e) => {
   switch (e.key) {
-    case ' ': case 'ArrowRight': case 'ArrowDown': case 'PageDown':
+    case ' ': case 'ArrowRight': case 'ArrowUp': case 'PageUp':
       e.preventDefault(); next(); break;
-    case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+    case 'ArrowLeft': case 'ArrowDown': case 'PageDown':
       e.preventDefault(); prev(); break;
     case 'f': case 'F': toggleFullscreen(); break;
     case 'h': case 'H': el.help.hidden = !el.help.hidden; break;

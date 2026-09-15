@@ -76,6 +76,9 @@ Se instalo Python 3.12 e img2threejs (la herramienta que menciona el handoff). C
 ### D14 — Hilo conductor: las venas bajan a la altura del piso (ajustada a 2.0)
 Kiwi senalo que las venas helicoidales de las paredes (D10) a veces se perdian dentro de la masa de particulas de cada estacion, al compartir casi la misma altura. Se baja el eje de las venas de 3.0 a 1.05 unidades sobre la linea de piso (`config.thread.height`), lejos de la altura de las masas de las estaciones (~3.5). Luego Kiwi noto que, al girar y latir, a esa altura (1.05) podian parecer atravesar la placa desde la perspectiva de la camara. Se sube a 2.0: suficientemente bajo para no competir con la masa de la estacion, suficientemente alto para librar el borde superior de la placa.
 
+### D15 — Flechas arriba/abajo: arriba avanza, abajo vuelve
+Kiwi senalo que la asociacion estaba invertida (abajo avanzaba, arriba volvia). Se corrige en `main.js`: ArrowUp/PageUp avanzan junto con Espacio/ArrowRight; ArrowDown/PageDown vuelven junto con ArrowLeft. El texto de ayuda en pantalla no menciona arriba/abajo (solo Espacio/flechas laterales), asi que no necesito actualizarlo.
+
 ## Lo que NO se importa del referente (recordatorio permanente)
 La espiral como ancla estable, la metáfora de órbita/comunidad, los nombres y valores de los parámetros de comportamiento del profesor (spiral/network/architecture/archive/stability), el formato de lienzo 2D a sangre completa, y la paleta cian/rojo/magenta ligada al branding de ese evento.
 
