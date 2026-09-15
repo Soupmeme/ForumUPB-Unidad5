@@ -61,7 +61,7 @@ export const stations = [
   },
   {
     slide: 5,
-    state: 'placeholder',
+    state: 'impact-radiates',
     intensity: 0.65,
     accent: 0.4,
     photo: 3,

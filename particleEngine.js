@@ -621,6 +621,118 @@ const handlers = {
       bcol[p1 + 0] = tint.r * v; bcol[p1 + 1] = tint.g * v; bcol[p1 + 2] = tint.b * v;
     }
   },
+
+  // Station 5: "Los eventos nunca fueron el objetivo. El impacto si." --
+  // studied from the referente's own "impact" state (motion-study.md):
+  // it reuses its OWN triad anchors from its prior "triad" moment, pulled
+  // inward toward a shared center, plus outward-radiating rings from that
+  // point. Same structural idea here, in our vocabulary: a small echo of
+  // station 4's triad (the "events") converges toward the center once
+  // (sys.activeTime, D18's one-shot technique) and then fades -- it was
+  // never the point. What replaces it, and keeps going for as long as the
+  // station is active, is a continuous outward-radiating wave (a recycled
+  // emitter: each particle has its own staggered birth-travel-fade cycle,
+  // motion-study's "the connection is drawn, not implied" applied to a
+  // trace of its own recent path rather than to another particle).
+  'impact-radiates'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const c = new THREE.Color();
+
+    if (!sys._impactSetup) {
+      sys._impactSetup = true;
+      const echoPerGroup = 12;
+      sys._impactEcho = [[0, echoPerGroup], [echoPerGroup, echoPerGroup * 2], [echoPerGroup * 2, echoPerGroup * 3]];
+      const waveFrom = echoPerGroup * 3;
+      sys._impactWaveRange = [waveFrom, sys.n];
+
+      const ax = 0.55, ay = 0.5; // a smaller echo of station 4's triad layout
+      sys._impactAnchors = [
+        new THREE.Vector3(0, ay, 0),
+        new THREE.Vector3(-ax, -ay * 0.55, 0),
+        new THREE.Vector3(ax, -ay * 0.55, 0),
+      ];
+
+      // A few traveling particles get a visible trace of their own recent
+      // path (a comet tail), showing direction and motion explicitly.
+      const trails = [];
+      const span = sys.n - waveFrom;
+      for (let k = 0; k < 16; k++) trails.push(waveFrom + Math.floor((k / 16) * span));
+      sys._impactTrails = trails;
+      sys.bonds.geometry.setDrawRange(0, trails.length * 2);
+    }
+
+    const t = sys.activeTime;
+    const converge = smoothstep(0.3, 2.0, t);       // the echo pulls inward, once
+    const echoFade = 1 - smoothstep(2.0, 3.4, t);    // then fades -- it was never the point
+    const radiate = smoothstep(1.6, 3.4, t);         // the impact takes over, and stays
+
+    // Echo: a small, understated convergence of the same three forces.
+    for (let gi = 0; gi < 3; gi++) {
+      const [from, to] = sys._impactEcho[gi];
+      const anchor = sys._impactAnchors[gi];
+      for (let i = from; i < to; i++) {
+        const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+        const r = 0.18 * sys.baseR[i];
+        const ax = cx + anchor.x * (1 - converge) + dx * r;
+        const ay = cy + anchor.y * (1 - converge) + dy * r;
+        const az = cz + anchor.z * (1 - converge) + dz * r;
+        pos[i * 3 + 0] = ax; pos[i * 3 + 1] = ay; pos[i * 3 + 2] = az;
+        const b = (0.3 + e * 0.2) * echoFade;
+        col[i * 3 + 0] = institution.r * b;
+        col[i * 3 + 1] = institution.g * b;
+        col[i * 3 + 2] = institution.b * b;
+      }
+    }
+
+    // Impact wave: a recycled emitter. Each particle owns a fixed radial
+    // direction and a staggered phase, so births overlap continuously --
+    // an ongoing shockwave, not a single pulse.
+    const [waveFrom, waveTo] = sys._impactWaveRange;
+    const maxR = config.station.cloudRadius * 1.05;
+    const L = 3.0; // seconds per particle's birth-to-fade cycle
+    const ageOf = (i) => {
+      const phaseFrac = sys.phase[i] / (Math.PI * 2);
+      return ((elapsed / L) + phaseFrac) % 1;
+    };
+    const radiusOf = (age) => maxR * Math.pow(age, 0.65);
+    const envelopeOf = (age) => smoothstep(0, 0.08, age) * (1 - smoothstep(0.6, 1, age));
+
+    for (let i = waveFrom; i < waveTo; i++) {
+      const age = ageOf(i);
+      const r = radiusOf(age);
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      pos[i * 3 + 0] = cx + dx * r;
+      pos[i * 3 + 1] = cy + dy * r;
+      pos[i * 3 + 2] = cz + dz * r;
+
+      const spark = smoothstep(0, 0.08, age) * (1 - smoothstep(0.08, 0.22, age));
+      c.copy(institution).lerp(hot, spark * 0.6);
+      const b = (0.3 + e * 0.3) * envelopeOf(age) * radiate;
+      col[i * 3 + 0] = c.r * b;
+      col[i * 3 + 1] = c.g * b;
+      col[i * 3 + 2] = c.b * b;
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    const trailBack = 0.05; // fraction of lifespan the tail reaches back
+    let k = 0;
+    for (const i of sys._impactTrails) {
+      const age = ageOf(i);
+      const ageBack = Math.max(0, age - trailBack);
+      const r = radiusOf(age), rBack = radiusOf(ageBack);
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = cx + dx * r; bpos[p0 + 1] = cy + dy * r; bpos[p0 + 2] = cz + dz * r;
+      bpos[p1 + 0] = cx + dx * rBack; bpos[p1 + 1] = cy + dy * rBack; bpos[p1 + 2] = cz + dz * rBack;
+      const v = 0.3 * envelopeOf(age) * radiate;
+      bcol[p0 + 0] = institution.r * v; bcol[p0 + 1] = institution.g * v; bcol[p0 + 2] = institution.b * v;
+      bcol[p1 + 0] = institution.r * v * 0.3; bcol[p1 + 1] = institution.g * v * 0.3; bcol[p1 + 2] = institution.b * v * 0.3;
+    }
+  },
 };
 
 export class ParticleEngine {
