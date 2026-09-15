@@ -79,9 +79,17 @@ class StationSystem {
     // Eased params (the "knobs" that move toward each moment's targets).
     this.params = { energy: config.station.idleIntensity, accent: station.accent ?? 0.5 };
     this.target = { energy: config.station.idleIntensity, accent: station.accent ?? 0.5 };
+
+    // A per-station clock that resets each time this station BECOMES active
+    // (motion-study.md #6). Lets a handler play a one-shot staged sequence
+    // (arrival -> encounter -> settle) instead of only looping continuously.
+    this.activeTime = 0;
+    this._isActive = false;
   }
 
   setActive(isActive) {
+    if (isActive && !this._isActive) this.activeTime = 0;
+    this._isActive = isActive;
     this.target.energy = isActive ? this.station.intensity : config.station.idleIntensity;
     this.target.accent = this.station.accent ?? 0.5;
   }
@@ -91,6 +99,7 @@ class StationSystem {
     const k = Math.min(1, dt * 2.5);
     this.params.energy += (this.target.energy - this.params.energy) * k;
     this.params.accent += (this.target.accent - this.params.accent) * k;
+    if (this._isActive) this.activeTime += dt;
 
     const handler = handlers[this.station.state] || handlers.placeholder;
     handler(this, elapsed);
@@ -371,6 +380,100 @@ const handlers = {
       bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
       bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
       const v = (kind === 'edge' ? 0.3 : 0.16) * hum;
+      bcol[p0 + 0] = base.r * v; bcol[p0 + 1] = base.g * v; bcol[p0 + 2] = base.b * v;
+      bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
+    }
+  },
+
+  // Station 3: "la Universidad decidio encontrarse con el mundo" -- the
+  // direct answer to station 2's confinement. Plays ONCE per activation,
+  // using sys.activeTime (motion-study.md #6): a small echo of station 2's
+  // box (half its size, not the centerpiece here) sits still for a moment,
+  // then steadily and confidently opens into a wide field that stays open --
+  // a transformation, not a breathing loop. No retreat: the decision holds.
+  'opens-to-world'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+
+    if (!sys._openSetup) {
+      sys._openSetup = true;
+      const cols = 10, layers = 3;
+      const rows = Math.max(2, Math.floor(sys.n / (cols * layers)));
+      sys._openGrid = { cols, rows, layers };
+      const idx = (u, v, w) => w * rows * cols + v * cols + u;
+      const uMax = cols - 1, vMax = rows - 1, wMax = layers - 1;
+      const edges = [];
+      for (const [v, w] of [[0, 0], [vMax, 0], [0, wMax], [vMax, wMax]]) edges.push([idx(0, v, w), idx(uMax, v, w)]);
+      for (const [u, w] of [[0, 0], [uMax, 0], [0, wMax], [uMax, wMax]]) edges.push([idx(u, 0, w), idx(u, vMax, w)]);
+      for (const [u, v] of [[0, 0], [uMax, 0], [0, vMax], [uMax, vMax]]) edges.push([idx(u, v, 0), idx(u, v, wMax)]);
+      sys._openEdges = edges;
+
+      // A handful of connections that only make sense once the space is
+      // open: longer, wider-reaching, fixed pairs spread across the pool.
+      const openBonds = [];
+      for (let k = 0; k < 10; k++) {
+        const a = (k * 37) % sys.n, b = (k * 37 + 97) % sys.n;
+        if (a !== b) openBonds.push([a, b]);
+      }
+      sys._openBonds = openBonds;
+      sys.bonds.geometry.setDrawRange(0, (edges.length + openBonds.length) * 2);
+    }
+
+    const { cols, rows, layers } = sys._openGrid;
+    // Act 1 (0-0.8s): the small box sits still. Act 2 (0.8-3.6s): it opens,
+    // measured and steady, never rushed. Act 3 (3.6s+): holds open, for good.
+    const openness = smoothstep(0.8, 3.6, sys.activeTime);
+
+    const gw = 1.1, gh = 0.9, gd = 0.35; // half station 2's box: an echo, not the centerpiece
+    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
+    const rot = elapsed * 0.05; // the open field drifts slowly, calmly
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+
+    for (let i = 0; i < sys.n; i++) {
+      const u = i % cols;
+      const v = Math.floor(i / cols) % rows;
+      const w = Math.floor(i / (cols * rows)) % layers;
+      const gx = (u / (cols - 1) - 0.5) * gw;
+      const gy = (v / (rows - 1) - 0.5) * gh;
+      const gz = layers > 1 ? (w / (layers - 1) - 0.5) * gd : 0;
+
+      // Open target: a wide, loosely drifting field -- reaching further out
+      // than any other station's cloud, and settling there for good.
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
+      const orNoise = Math.sin(elapsed * 0.6 + sys.phase[i]) * 0.06;
+      const orR = config.station.cloudRadius * sys.baseR[i] * 1.35 + orNoise;
+      const ox = rx * orR, oy = dy * orR, oz = rz * orR;
+
+      const px = cx + gx + (ox - gx) * openness;
+      const py = cy + gy + (oy - gy) * openness;
+      const pz = cz + gz + (oz - gz) * openness;
+      pos[i * 3 + 0] = px; pos[i * 3 + 1] = py; pos[i * 3 + 2] = pz;
+
+      const b = 0.32 + e * 0.3 + openness * 0.16;
+      col[i * 3 + 0] = base.r * b;
+      col[i * 3 + 1] = base.g * b;
+      col[i * 3 + 2] = base.b * b;
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    let k = 0;
+    for (const [a, b] of sys._openEdges) {
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const v = 0.26 * (1 - openness); // the small cage fades as it opens
+      bcol[p0 + 0] = base.r * v; bcol[p0 + 1] = base.g * v; bcol[p0 + 2] = base.b * v;
+      bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
+    }
+    for (const [a, b] of sys._openBonds) {
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const v = 0.14 * openness; // new connections, only possible once open
       bcol[p0 + 0] = base.r * v; bcol[p0 + 1] = base.g * v; bcol[p0 + 2] = base.b * v;
       bcol[p1 + 0] = base.r * v; bcol[p1 + 1] = base.g * v; bcol[p1 + 2] = base.b * v;
     }

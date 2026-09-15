@@ -40,7 +40,7 @@ export const stations = [
   },
   {
     slide: 3,
-    state: 'placeholder',
+    state: 'opens-to-world',
     intensity: 0.5,
     accent: 0.2,
     text: [
