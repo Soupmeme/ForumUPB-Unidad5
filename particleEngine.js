@@ -664,10 +664,16 @@ const handlers = {
       sys.bonds.geometry.setDrawRange(0, trails.length * 2);
     }
 
+    // Paced slowly and with real separation between beats, so the causal
+    // link (this point converged -> that's what bursts) survives a blink:
+    // the triangle sits still and legible, THEN converges slowly, THEN
+    // holds at the merged point for a moment before anything bursts, and
+    // only much later -- well after the burst is already visible -- does
+    // the origin point fade.
     const t = sys.activeTime;
-    const converge = smoothstep(0.3, 2.0, t);       // the echo pulls inward, once
-    const echoFade = 1 - smoothstep(2.0, 3.4, t);    // then fades -- it was never the point
-    const radiate = smoothstep(1.6, 3.4, t);         // the impact takes over, and stays
+    const converge = smoothstep(1.0, 4.6, t);        // sit, then pull inward, slowly
+    const radiate = smoothstep(5.2, 8.0, t);          // a held pause, then the impact takes over
+    const echoFade = 1 - smoothstep(6.5, 9.5, t);     // stays visible well into the burst, then fades
 
     // Echo: a small, understated convergence of the same three forces.
     for (let gi = 0; gi < 3; gi++) {
