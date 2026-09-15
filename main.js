@@ -8,7 +8,7 @@ import { config } from './config.js';
 import { stations } from './stations.js';
 import { HallScene } from './sceneSystem.js';
 import { ParticleEngine } from './particleEngine.js';
-import { makePlacardTexture } from './placardText.js';
+import { makePlacardTexture, ensureFonts } from './placardText.js';
 
 // ---- Renderer ----
 const container = document.getElementById('scene');
@@ -30,14 +30,19 @@ const hall = new HallScene(scene, stations.length);
 const engine = new ParticleEngine(scene, hall, stations);
 
 // Bake each station's words onto its in-world placard (decision D3, revised).
-stations.forEach((st, i) => {
-  hall.setLabel(i, makePlacardTexture({
-    text: st.text,
-    handle: st.handle,
-    photo: st.photo,
-    closing: st.isClosing,
-  }));
-});
+// Wait for the vendored font first, otherwise the canvas bakes with a fallback.
+async function bakeLabels() {
+  await ensureFonts();
+  stations.forEach((st, i) => {
+    hall.setLabel(i, makePlacardTexture({
+      text: st.text,
+      handle: st.handle,
+      photo: st.photo,
+      closing: st.isClosing,
+    }));
+  });
+}
+bakeLabels();
 
 // ---- Navigation state ----
 let current = 0;

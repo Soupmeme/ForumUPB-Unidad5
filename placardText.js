@@ -10,7 +10,21 @@ import * as THREE from 'three';
 const W = 1400;              // canvas resolution (panel is ~1.75:1)
 const H = 800;
 const PAD = 110;
-const FAMILY = 'Helvetica, Arial, sans-serif';
+const FAMILY = '"Space Grotesk", Helvetica, Arial, sans-serif';
+
+// Load the weights the placards use before any texture is baked, otherwise the
+// canvas falls back to a system font. Call and await before makePlacardTexture.
+export async function ensureFonts() {
+  if (!document.fonts) return;
+  try {
+    await Promise.all([
+      document.fonts.load('400 82px "Space Grotesk"'),
+      document.fonts.load('700 82px "Space Grotesk"'),
+      document.fonts.load('500 40px "Space Grotesk"'),
+    ]);
+    await document.fonts.ready;
+  } catch { /* fall back to system font */ }
+}
 const INK = '#f4efe2';
 const AMBER = '#f2b705';
 const JADE = '#7fd6c4';
@@ -36,7 +50,7 @@ function wrap(ctx, tokens, maxWidth, fontPx) {
   let line = [];
   let width = 0;
   const measure = (tok) => {
-    ctx.font = `${tok.em ? '700' : '300'} ${fontPx}px ${FAMILY}`;
+    ctx.font = `${tok.em ? '700' : '400'} ${fontPx}px ${FAMILY}`;
     return ctx.measureText(tok.text).width;
   };
   for (const tok of tokens) {
@@ -59,7 +73,7 @@ function wrap(ctx, tokens, maxWidth, fontPx) {
 function drawLine(ctx, line, cx, y, fontPx) {
   let x = cx - line.width / 2;
   for (const tok of line.tokens) {
-    ctx.font = `${tok.em ? '700' : '300'} ${fontPx}px ${FAMILY}`;
+    ctx.font = `${tok.em ? '700' : '400'} ${fontPx}px ${FAMILY}`;
     ctx.fillStyle = tok.em ? AMBER : INK;
     ctx.textBaseline = 'alphabetic';
     ctx.fillText(tok.text, x, y);
@@ -95,7 +109,7 @@ export function makePlacardTexture(content) {
       const toks = tokenize([seg]);
       let width = 0;
       for (const t of toks) {
-        ctx.font = `${t.em ? '700' : '300'} ${fontPx}px ${FAMILY}`;
+        ctx.font = `${t.em ? '700' : '400'} ${fontPx}px ${FAMILY}`;
         width += ctx.measureText(t.text).width;
       }
       return { tokens: toks, width };

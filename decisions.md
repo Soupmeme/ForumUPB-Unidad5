@@ -47,6 +47,9 @@ El guion del cliente (`TED TALK BRASIL.docx`) está en español. Se construye en
 ### D8 — Normalización mínima de espacios
 El guion original tiene, en algunos momentos, dos frases pegadas sin espacio (p. ej. "personas.Una"). Se añade el espacio normal entre frases para legibilidad. NINGUNA palabra ni el orden ni el énfasis (negritas) se alteran; solo el espacio en blanco entre oraciones.
 
+### D9 — Tipografia: Space Grotesk (grotesca moderna), vendorizada
+Kiwi pidio una tipografia acorde a una expo academica/de industria; la sans por defecto del navegador se veia demasiado simple. Direccion elegida: grotesca moderna, todo en una sola familia para mantener coherencia. Se usa Space Grotesk (fuente variable, peso 300 a 700) en placas y cromo. Se guarda localmente en `fonts/` (subconjunto latino, cubre acentos y ¿) para conservar el modo sin conexion. El canvas de las placas espera a que la fuente cargue (`ensureFonts`) antes de hornear las texturas, si no usaria una fuente de reemplazo. Peso normal 400 (el 300 quedaba muy delgado a distancia), enfasis 700 en ambar.
+
 ## Lo que NO se importa del referente (recordatorio permanente)
 La espiral como ancla estable, la metáfora de órbita/comunidad, los nombres y valores de los parámetros de comportamiento del profesor (spiral/network/architecture/archive/stability), el formato de lienzo 2D a sangre completa, y la paleta cian/rojo/magenta ligada al branding de ese evento.
 

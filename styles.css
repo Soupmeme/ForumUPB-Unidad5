@@ -1,10 +1,17 @@
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("fonts/space-grotesk-latin.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
 :root {
   --ink: #f4efe2;
   --ink-dim: #b9b09a;
   --amber: #f2b705;
   --jade: #37b9a0;
   --bg: #0e1116;
-  --font: "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font: "Space Grotesk", "Helvetica Neue", Arial, system-ui, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
