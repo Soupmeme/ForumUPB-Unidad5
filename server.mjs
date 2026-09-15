@@ -30,7 +30,13 @@ createServer(async (req, res) => {
     const filePath = normalize(join(root, urlPath));
     if (!filePath.startsWith(root)) { res.writeHead(403).end('Forbidden'); return; }
     const data = await readFile(filePath);
-    res.writeHead(200, { 'Content-Type': types[extname(filePath)] || 'application/octet-stream' });
+    // No caching: this is a dev server, and stale ES module caching (the
+    // browser can reuse an old imported .js file even after a top-level
+    // reload with a new query string) has caused confusing test results.
+    res.writeHead(200, {
+      'Content-Type': types[extname(filePath)] || 'application/octet-stream',
+      'Cache-Control': 'no-store',
+    });
     res.end(data);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found');

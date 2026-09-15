@@ -86,7 +86,7 @@ export const stations = [
   },
   {
     slide: 7,
-    state: 'placeholder',
+    state: 'trust-grows',
     intensity: 0.6,
     accent: 0.5,
     text: [

@@ -798,7 +798,11 @@ const handlers = {
     };
     const sidePosOf = (i, atTime) => {
       const phaseOffset = sys.phase[i] / (Math.PI * 2);
-      const phaseFrac = ((atTime / cycleLen) + phaseOffset) % 1;
+      const raw = (atTime / cycleLen) + phaseOffset;
+      // Positive modulo: atTime can go negative (the trail looks slightly
+      // back in time, elapsed - trailBack, which is negative for the first
+      // instant after load) and JS's % does not wrap negatives into [0,1).
+      const phaseFrac = ((raw % 1) + 1) % 1;
       return wave4(phaseFrac);
     };
     const colorAt = (sidePos, target) => {
@@ -839,6 +843,90 @@ const handlers = {
       const v = 0.24;
       bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
       bcol[p1 + 0] = c.r * v * 0.25; bcol[p1 + 1] = c.g * v * 0.25; bcol[p1 + 2] = c.b * v * 0.25;
+    }
+  },
+
+  // Station 7: "El talento crece a la velocidad de la confianza." Studied
+  // from the referente's own "trust" state: a close technical sibling of
+  // "community" (same bond mechanism, motion-study.md #2), tuned to the
+  // opposite mood -- many more bonds, almost perfectly straight instead of
+  // curved (barely any pull toward center), on a network that GROWS over
+  // the moment's duration rather than looping. "El talento crece" is
+  // literal here: this is a one-shot growth (sys.activeTime, D18's
+  // technique), not a breathing cycle -- it grows once, and stays grown.
+  //
+  // Color: settled `hot` -- the same warm near-white station 6 used for its
+  // flickering, uncertain crossings, but here stable and multiplying. Trust
+  // is what CRYSTALLIZES from that exchange: process in station 6, result
+  // in station 7.
+  'trust-grows'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+
+    if (!sys._trustSetup) {
+      sys._trustSetup = true;
+      const bonds = [];
+      for (let k = 0; k < 40; k++) {
+        const a = (k * 17) % sys.n, b = (k * 17 + 53) % sys.n;
+        if (a !== b) bonds.push([a, b]);
+      }
+      sys._trustBonds = bonds;
+      sys._trustSegs = 3; // fewer segments needed -- these barely curve
+      sys.bonds.geometry.setDrawRange(0, bonds.length * sys._trustSegs * 2);
+    }
+
+    const t = sys.activeTime;
+    const growth = smoothstep(0.3, 5.5, t); // grows once, measured, then holds
+    const baseRadius = config.station.cloudRadius * 0.5;
+    const grownRadius = baseRadius * (1 + growth * 0.9);
+
+    const rot = elapsed * 0.05; // slow, settled -- confidence, not searching
+    const cs = Math.cos(rot), sn = Math.sin(rot);
+    const pulse = 0.85 + 0.15 * Math.sin(elapsed * 0.5); // gentle, not nervous
+
+    for (let i = 0; i < sys.n; i++) {
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
+      const r = grownRadius * sys.baseR[i] * (0.8 + e * 0.1);
+      pos[i * 3 + 0] = cx + rx * r;
+      pos[i * 3 + 1] = cy + dy * r;
+      pos[i * 3 + 2] = cz + rz * r;
+
+      const b = (0.34 + e * 0.28) * pulse;
+      col[i * 3 + 0] = hot.r * b;
+      col[i * 3 + 1] = hot.g * b;
+      col[i * 3 + 2] = hot.b * b;
+    }
+
+    // Same curved-bond machinery as station 6's huddle, one parameter
+    // flipped: `pull` near zero instead of 0.4 -- direct, not curved.
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    const segs = sys._trustSegs;
+    const pull = 0.08;
+    let k = 0;
+    for (const [a, b] of sys._trustBonds) {
+      const ax = pos[a * 3 + 0], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
+      const bx = pos[b * 3 + 0], by = pos[b * 3 + 1], bz = pos[b * 3 + 2];
+      const mx = (ax + bx) / 2, my = (ay + by) / 2, mz = (az + bz) / 2;
+      const ctrlX = mx + (cx - mx) * pull, ctrlY = my + (cy - my) * pull, ctrlZ = mz + (cz - mz) * pull;
+      const v = (0.1 + growth * 0.16) * pulse; // the network reads denser as trust grows
+
+      let px0 = ax, py0 = ay, pz0 = az;
+      for (let s = 1; s <= segs; s++) {
+        const tt = s / segs;
+        const px1 = quadPoint(ax, ctrlX, bx, tt);
+        const py1 = quadPoint(ay, ctrlY, by, tt);
+        const pz1 = quadPoint(az, ctrlZ, bz, tt);
+        const p0 = k * 6, p1 = k * 6 + 3; k++;
+        bpos[p0 + 0] = px0; bpos[p0 + 1] = py0; bpos[p0 + 2] = pz0;
+        bpos[p1 + 0] = px1; bpos[p1 + 1] = py1; bpos[p1 + 2] = pz1;
+        bcol[p0 + 0] = hot.r * v; bcol[p0 + 1] = hot.g * v; bcol[p0 + 2] = hot.b * v;
+        bcol[p1 + 0] = hot.r * v; bcol[p1 + 1] = hot.g * v; bcol[p1 + 2] = hot.b * v;
+        px0 = px1; py0 = py1; pz0 = pz1;
+      }
     }
   },
 };
