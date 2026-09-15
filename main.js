@@ -138,7 +138,7 @@ function animate() {
   camera.position.copy(camPos);
   camera.lookAt(camLook);
 
-  hall.update(dt);
+  hall.update(dt, elapsed);
   engine.update(dt, elapsed);
   renderer.render(scene, camera);
 }

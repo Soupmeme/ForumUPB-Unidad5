@@ -159,30 +159,29 @@ export class HallScene {
 
   _buildThread() {
     const n = config.thread.particles;
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    this.threadPhase = new Float32Array(n);
-    this.threadOffset = new Float32Array(n);
+    this.threadU0 = new Float32Array(n);     // base position along the hall (0..1)
+    this.threadStrand = new Float32Array(n); // which helix filament
+    this.threadRJit = new Float32Array(n);   // per-particle radius variation
 
-    const zNear = this.stationZ(0) + config.camera.standBack;
-    const zFar = this.stationZ(this.count - 1) - 4;
-    this.threadZNear = zNear;
-    this.threadZFar = zFar;
+    // Start the vein a little ahead of the first station (never at the camera,
+    // or near-end particles render on top of the lens) and end past the last.
+    this.threadZNear = this.stationZ(0) + 3;
+    this.threadZFar = this.stationZ(this.count - 1) - 4;
 
     for (let i = 0; i < n; i++) {
-      this.threadPhase[i] = Math.random();          // 0..1 along the hall
-      this.threadOffset[i] = Math.random() * Math.PI * 2;
-      this._placeThread(i, pos, col);
+      this.threadU0[i] = i / n + (Math.random() - 0.5) * (1 / n);
+      this.threadStrand[i] = i % config.thread.strands;
+      this.threadRJit[i] = 0.82 + Math.random() * 0.18;
     }
 
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
     const m = new THREE.PointsMaterial({
       size: config.thread.pointSize,
       vertexColors: true,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -191,34 +190,56 @@ export class HallScene {
 
     this._elderColor = new THREE.Color(P.accentElder);
     this._youngColor = new THREE.Color(P.accentYoung);
+    this._hot = new THREE.Color(0xfff2d0);
+    this._tmpColor = new THREE.Color();
+    this._placeThreadAll(0);
   }
 
-  _placeThread(i, pos, col) {
-    const t = this.threadPhase[i];
-    const z = this.threadZNear + (this.threadZFar - this.threadZNear) * t;
-    const wobble = Math.sin(this.threadOffset[i] + t * 10) * config.thread.jitter;
-    pos[i * 3 + 0] = wobble;
-    pos[i * 3 + 1] = this.floorY(z) + config.thread.height + Math.cos(this.threadOffset[i] + t * 8) * 0.15;
-    pos[i * 3 + 2] = z;
-    // Color hands off from elder (near) to young (far): the relevo, as flow.
-    const c = new THREE.Color().lerpColors(this._elderColor || new THREE.Color(P.accentElder), this._youngColor || new THREE.Color(P.accentYoung), t);
-    col[i * 3 + 0] = c.r;
-    col[i * 3 + 1] = c.g;
-    col[i * 3 + 2] = c.b;
+  // Heartbeat strength at hall-position u and time t: distance to the nearest
+  // forward-travelling pulse, shaped into a sharp gaussian.
+  _pulseGain(u, t) {
+    const wl = config.thread.pulseWavelength;
+    let m = ((u - t * config.thread.pulseSpeed) % wl + wl) % wl;
+    const d = Math.min(m, wl - m);
+    const x = d / config.thread.pulseWidth;
+    return Math.exp(-x * x);
   }
 
-  update(dt) {
-    if (!this.thread) return;
+  _placeThreadAll(t) {
     const pos = this.thread.geometry.attributes.position.array;
     const col = this.thread.geometry.attributes.color.array;
-    const span = Math.abs(this.threadZFar - this.threadZNear);
-    const advance = (config.thread.speed / span) * dt;
-    for (let i = 0; i < config.thread.particles; i++) {
-      this.threadPhase[i] += advance;      // flow from near toward far (forward/up)
-      if (this.threadPhase[i] > 1) this.threadPhase[i] -= 1;
-      this._placeThread(i, pos, col);
+    const T = config.thread;
+    const spanZ = this.threadZFar - this.threadZNear;
+    for (let i = 0; i < T.particles; i++) {
+      let u = this.threadU0[i] + T.flowSpeed * t;
+      u -= Math.floor(u);                         // wrap to 0..1
+      const z = this.threadZNear + spanZ * u;
+      const axisY = this.floorY(z) + T.height;
+
+      const g = this._pulseGain(u, t);            // 0..1 heartbeat
+      const r = T.radius * this.threadRJit[i] * (1 + g * T.swell);
+      const side = this.threadStrand[i] < 1 ? -1 : 1; // strand 0 -> left wall, 1 -> right
+      const angle = u * T.turns * Math.PI * 2 + T.spin * t;
+
+      pos[i * 3 + 0] = side * T.wallOffset + Math.cos(angle) * r;
+      pos[i * 3 + 1] = axisY + Math.sin(angle) * r;
+      pos[i * 3 + 2] = z;
+
+      // Elder -> young gradient along the hall (relevo as flow), brightening
+      // to a hot near-white where a beat passes.
+      this._tmpColor.lerpColors(this._elderColor, this._youngColor, u);
+      this._tmpColor.lerp(this._hot, g * 0.65);
+      const b = 0.42 + g * 0.58;
+      col[i * 3 + 0] = this._tmpColor.r * b;
+      col[i * 3 + 1] = this._tmpColor.g * b;
+      col[i * 3 + 2] = this._tmpColor.b * b;
     }
     this.thread.geometry.attributes.position.needsUpdate = true;
     this.thread.geometry.attributes.color.needsUpdate = true;
+  }
+
+  update(dt, elapsed) {
+    if (!this.thread) return;
+    this._placeThreadAll(elapsed);
   }
 }

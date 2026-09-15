@@ -47,6 +47,15 @@ El guion del cliente (`TED TALK BRASIL.docx`) está en español. Se construye en
 ### D8 — Normalización mínima de espacios
 El guion original tiene, en algunos momentos, dos frases pegadas sin espacio (p. ej. "personas.Una"). Se añade el espacio normal entre frases para legibilidad. NINGUNA palabra ni el orden ni el énfasis (negritas) se alteran; solo el espacio en blanco entre oraciones.
 
+### D10 — El hilo conductor se vuelve una helice doble que late (dos venas laterales)
+Kiwi pidio darle mas vuelo al hilo que conecta las estaciones: una helice en espiral que pulsa a intervalos (como un latido / una vena que lleva la sangre) para significar que el sentido se transmite de una estacion a la siguiente.
+
+Distincion con el referente (importante para Actividad 03): su espiral es un ANCLA estatica en un centro fijo alrededor del cual orbitan las particulas (relacion orbital, sentido = estabilidad). Esta helice es lo contrario: un CONDUCTO que viaja por el eje procesional y empuja latidos hacia adelante (relacion de transmision, sentido = relevo que se lleva onward). Una ancla frente a una vena. No se reimporta el recurso: se contrasta con el.
+
+Restriccion de geometria descubierta al implementar: como la camara siempre mira por el eje del pasillo, una helice central se ve de frente (escorzada, se lee como una mancha) y ademas compite con la placa y el cubo de particulas del centro. Se probaron alturas y radios; el centro nunca lee bien. Solucion: sacar la vena del eje central y llevarla a las PAREDES. Dos venas, una por pared, que se ven a lo largo (en escorzo lateral, no de frente), siempre visibles flanqueando la placa y alejandose hacia el fondo. Bonus narrativo: dos venas = dos generaciones que acompañan el camino a ambos lados.
+
+El latido es una gaussiana viajera en el parametro a lo largo del pasillo: donde pasa el pulso, la vena se ensancha (swell) y brilla hacia un blanco calido. Los pulsos avanzan hacia adelante (hacia la siguiente estacion) a intervalos regulares. Todo es ajustable en `config.thread` (radius, wallOffset, height, turns, pulseWavelength, pulseSpeed, pulseWidth, swell).
+
 ### D9 — Tipografia: Space Grotesk (grotesca moderna), vendorizada
 Kiwi pidio una tipografia acorde a una expo academica/de industria; la sans por defecto del navegador se veia demasiado simple. Direccion elegida: grotesca moderna, todo en una sola familia para mantener coherencia. Se usa Space Grotesk (fuente variable, peso 300 a 700) en placas y cromo. Se guarda localmente en `fonts/` (subconjunto latino, cubre acentos y ¿) para conservar el modo sin conexion. El canvas de las placas espera a que la fuente cargue (`ensureFonts`) antes de hornear las texturas, si no usaria una fuente de reemplazo. Peso normal 400 (el 300 quedaba muy delgado a distancia), enfasis 700 en ambar.
 
