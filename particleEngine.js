@@ -847,13 +847,16 @@ const handlers = {
   },
 
   // Station 7: "El talento crece a la velocidad de la confianza." Studied
-  // from the referente's own "trust" state: a close technical sibling of
-  // "community" (same bond mechanism, motion-study.md #2), tuned to the
-  // opposite mood -- many more bonds, almost perfectly straight instead of
-  // curved (barely any pull toward center), on a network that GROWS over
-  // the moment's duration rather than looping. "El talento crece" is
-  // literal here: this is a one-shot growth (sys.activeTime, D18's
-  // technique), not a breathing cycle -- it grows once, and stays grown.
+  // from the referente's own "trust" state (motion-study.md #2): a close
+  // technical sibling of "community", tuned to the opposite mood -- many
+  // more bonds, almost straight instead of curved -- on a network that
+  // GROWS once over the moment's duration rather than looping ("el talento
+  // crece" is close to literal). Kiwi asked for more: an actual spider-web
+  // structure, not a loose cloud with lines. So the geometry itself is now
+  // ORDERED -- radial spokes from a hub, crossed by concentric rings, the
+  // classic orb-weaver topology -- not particles scattered on a random
+  // sphere. An ordered structure is what makes "many straight bonds" read
+  // as a built thing instead of noise.
   //
   // Color: settled `hot` -- the same warm near-white station 6 used for its
   // flickering, uncertain crossings, but here stable and multiplying. Trust
@@ -867,66 +870,57 @@ const handlers = {
 
     if (!sys._trustSetup) {
       sys._trustSetup = true;
-      const bonds = [];
-      for (let k = 0; k < 40; k++) {
-        const a = (k * 17) % sys.n, b = (k * 17 + 53) % sys.n;
-        if (a !== b) bonds.push([a, b]);
+      const spokes = 30, shells = 12; // 30*12 = sys.n exactly
+      sys._trustSpokes = spokes;
+      sys._trustShells = shells;
+      const idx = (spoke, shell) => shell * spokes + spoke;
+
+      const bonds = []; // [spoke-or-a, shell-or-b] pairs; straight, not curved
+      for (let s = 0; s < spokes; s++) bonds.push([idx(s, 0), idx(s, shells - 1)]); // radial spokes
+      for (const ringShell of [2, 5, 8, shells - 1]) { // concentric rings at a few radii
+        for (let s = 0; s < spokes; s++) bonds.push([idx(s, ringShell), idx((s + 1) % spokes, ringShell)]);
       }
       sys._trustBonds = bonds;
-      sys._trustSegs = 3; // fewer segments needed -- these barely curve
-      sys.bonds.geometry.setDrawRange(0, bonds.length * sys._trustSegs * 2);
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2); // straight: one segment each
     }
 
+    const spokes = sys._trustSpokes, shells = sys._trustShells;
     const t = sys.activeTime;
     const growth = smoothstep(0.3, 5.5, t); // grows once, measured, then holds
-    const baseRadius = config.station.cloudRadius * 0.5;
-    const grownRadius = baseRadius * (1 + growth * 0.9);
+    const baseRadius = config.station.cloudRadius * 0.55;
+    const grownRadius = baseRadius * (0.15 + growth * 0.95);
+    const domeDepth = 0.55; // apex bulges toward the visitor, rim recedes to the plinth
 
     const rot = elapsed * 0.05; // slow, settled -- confidence, not searching
-    const cs = Math.cos(rot), sn = Math.sin(rot);
     const pulse = 0.85 + 0.15 * Math.sin(elapsed * 0.5); // gentle, not nervous
 
     for (let i = 0; i < sys.n; i++) {
-      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
-      const rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
-      const r = grownRadius * sys.baseR[i] * (0.8 + e * 0.1);
-      pos[i * 3 + 0] = cx + rx * r;
-      pos[i * 3 + 1] = cy + dy * r;
-      pos[i * 3 + 2] = cz + rz * r;
+      const spoke = i % spokes, shell = Math.floor(i / spokes) % shells;
+      const shellFrac = (shell + 1) / shells;
+      const angle = (spoke / spokes) * Math.PI * 2 + rot;
+      const r = grownRadius * shellFrac;
+      pos[i * 3 + 0] = cx + Math.cos(angle) * r;
+      pos[i * 3 + 1] = cy + Math.sin(angle) * r;
+      pos[i * 3 + 2] = cz + domeDepth * (1 - shellFrac) * growth;
 
-      const b = (0.34 + e * 0.28) * pulse;
+      const b = (0.3 + e * 0.28) * pulse * (0.7 + 0.3 * (1 - shellFrac)); // hub glows a touch brighter
       col[i * 3 + 0] = hot.r * b;
       col[i * 3 + 1] = hot.g * b;
       col[i * 3 + 2] = hot.b * b;
     }
 
-    // Same curved-bond machinery as station 6's huddle, one parameter
-    // flipped: `pull` near zero instead of 0.4 -- direct, not curved.
+    // Straight threads: spokes radiating from the hub, plus a few rings
+    // crossing them at fixed radii -- an actual web, not random pairs.
     const bpos = sys.bonds.geometry.attributes.position.array;
     const bcol = sys.bonds.geometry.attributes.color.array;
-    const segs = sys._trustSegs;
-    const pull = 0.08;
+    const v = (0.14 + growth * 0.2) * pulse;
     let k = 0;
     for (const [a, b] of sys._trustBonds) {
-      const ax = pos[a * 3 + 0], ay = pos[a * 3 + 1], az = pos[a * 3 + 2];
-      const bx = pos[b * 3 + 0], by = pos[b * 3 + 1], bz = pos[b * 3 + 2];
-      const mx = (ax + bx) / 2, my = (ay + by) / 2, mz = (az + bz) / 2;
-      const ctrlX = mx + (cx - mx) * pull, ctrlY = my + (cy - my) * pull, ctrlZ = mz + (cz - mz) * pull;
-      const v = (0.1 + growth * 0.16) * pulse; // the network reads denser as trust grows
-
-      let px0 = ax, py0 = ay, pz0 = az;
-      for (let s = 1; s <= segs; s++) {
-        const tt = s / segs;
-        const px1 = quadPoint(ax, ctrlX, bx, tt);
-        const py1 = quadPoint(ay, ctrlY, by, tt);
-        const pz1 = quadPoint(az, ctrlZ, bz, tt);
-        const p0 = k * 6, p1 = k * 6 + 3; k++;
-        bpos[p0 + 0] = px0; bpos[p0 + 1] = py0; bpos[p0 + 2] = pz0;
-        bpos[p1 + 0] = px1; bpos[p1 + 1] = py1; bpos[p1 + 2] = pz1;
-        bcol[p0 + 0] = hot.r * v; bcol[p0 + 1] = hot.g * v; bcol[p0 + 2] = hot.b * v;
-        bcol[p1 + 0] = hot.r * v; bcol[p1 + 1] = hot.g * v; bcol[p1 + 2] = hot.b * v;
-        px0 = px1; py0 = py1; pz0 = pz1;
-      }
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      bcol[p0 + 0] = hot.r * v; bcol[p0 + 1] = hot.g * v; bcol[p0 + 2] = hot.b * v;
+      bcol[p1 + 0] = hot.r * v; bcol[p1 + 1] = hot.g * v; bcol[p1 + 2] = hot.b * v;
     }
   },
 };
