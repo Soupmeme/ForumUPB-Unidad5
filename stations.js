@@ -18,7 +18,7 @@
 export const stations = [
   {
     slide: 1,
-    state: 'latent-reach',
+    state: 'twin-reach',
     intensity: 0.6,
     accent: 0.05,
     handle: '@centrodeeventosupb',

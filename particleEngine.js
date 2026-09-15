@@ -110,50 +110,49 @@ const handlers = {
     }
   },
 
-  // Station 1: a soft mass of latent potential that slowly breathes, and where
-  // the reaching hand enters (sys.reachPoint, world space), the nearest
-  // particles lift toward the fingertips and brighten (potential being reached).
-  'latent-reach'(sys, elapsed) {
+  // Station 1 (the thesis): two distinct masses, an elder (amber) and a young
+  // (jade), each breathing on its own, their inner edges reaching ever so
+  // softly toward each other across a gap and then withdrawing. They never
+  // touch: the connection is real but not yet made (the advantage nobody takes).
+  'twin-reach'(sys, elapsed) {
     const pos = sys.points.geometry.attributes.position.array;
     const col = sys.points.geometry.attributes.color.array;
     const e = sys.params.energy;
-    const breathe = 0.5 + 0.5 * Math.sin(elapsed * 1.05); // slow held-breath pulse
-    const base = new THREE.Color().lerpColors(elder, young, sys.params.accent);
-    const c = new THREE.Color();
-    const rp = sys.reachPoint || null;
-    const reachR = 1.0;
-    const rot = elapsed * 0.08;
-    const cs = Math.cos(rot), sn = Math.sin(rot);
     const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const gapHalf = 1.75;                      // distance of each mass from center
+    const cr = config.station.cloudRadius * 0.5;
+    const breatheL = 0.5 + 0.5 * Math.sin(elapsed * 0.95);
+    const breatheR = 0.5 + 0.5 * Math.sin(elapsed * 0.95 + 0.9); // out of phase
+    const reach = 0.5 + 0.5 * Math.sin(elapsed * 0.45);          // slow, soft
+    const half = sys.n >> 1;
+    const c = new THREE.Color();
 
     for (let i = 0; i < sys.n; i++) {
-      let dx = sys.baseDir[i * 3 + 0];
+      const side = i < half ? -1 : 1;          // -1 = elder (left), +1 = young (right)
+      const breathe = side < 0 ? breatheL : breatheR;
+      const rot = elapsed * 0.1 * -side;        // gentle counter-rotation per mass
+      const cs = Math.cos(rot), sn = Math.sin(rot);
+      const dx = sys.baseDir[i * 3 + 0];
       const dy = sys.baseDir[i * 3 + 1];
-      let dz = sys.baseDir[i * 3 + 2];
+      const dz = sys.baseDir[i * 3 + 2];
       const rx = dx * cs - dz * sn;
       const rz = dx * sn + dz * cs;
-      const r = config.station.cloudRadius * sys.baseR[i] * (0.7 + 0.22 * breathe + e * 0.18);
-      let px = cx + rx * r;
+      const r = cr * sys.baseR[i] * (0.72 + 0.2 * breathe + e * 0.12);
+      let px = cx + side * gapHalf + rx * r;
       let py = cy + dy * r;
       let pz = cz + rz * r;
 
-      // Reach response: proximity to the fingertips pulls and brightens.
-      let g = 0;
-      if (rp) {
-        const ddx = px - rp.x, ddy = py - rp.y, ddz = pz - rp.z;
-        const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
-        g = Math.exp(-(dist / reachR) * (dist / reachR));
-        const pull = g * 0.55;
-        px += (rp.x - px) * pull;
-        py += (rp.y - py) * pull;
-        pz += (rp.z - pz) * pull;
-      }
+      // Inner-facing particles stretch toward the gap, softly, then relax.
+      const innerness = Math.max(0, rx * -side); // 1 where the point faces the other mass
+      const g = innerness * reach;
+      px += (cx - px) * (g * 0.3);              // reach softly, keep a gap
+
       pos[i * 3 + 0] = px;
       pos[i * 3 + 1] = py;
       pos[i * 3 + 2] = pz;
 
-      c.copy(base).lerp(hot, g * 0.7);
-      const b = 0.34 + 0.32 * breathe + g * 0.5;
+      c.copy(side < 0 ? elder : young).lerp(hot, g * 0.32);
+      const b = 0.4 + 0.3 * breathe + g * 0.26;
       col[i * 3 + 0] = c.r * b;
       col[i * 3 + 1] = c.g * b;
       col[i * 3 + 2] = c.b * b;

@@ -35,7 +35,6 @@ Contenido y render están desacoplados (esa separación es lo que obliga a que t
 
 ## Créditos
 
-- Modelo de la mano (Estación 1): "Low poly hands" por Anastasiia Ku, licencia CC-BY, vía [Poly Pizza](https://poly.pizza/m/cGaYRuiPCMe). `assets/hand.glb`.
 - Tipografía: Space Grotesk (SIL Open Font License).
 - Three.js (MIT), vendorizado en `vendor/`.
 

@@ -9,7 +9,6 @@ import { stations } from './stations.js';
 import { HallScene } from './sceneSystem.js';
 import { ParticleEngine } from './particleEngine.js';
 import { makePlacardTexture, ensureFonts } from './placardText.js';
-import { createHand } from './hand.js';
 
 // ---- Renderer ----
 const container = document.getElementById('scene');
@@ -44,26 +43,6 @@ async function bakeLabels() {
   });
 }
 bakeLabels();
-
-// Station 1 exhibit: a real hand model reaching up into the mass of latent
-// potential. Loaded asynchronously from a GLB.
-const cc0 = hall.cloudCenter(0);
-createHand().then(({ group: handGroup, reachPoint: handReachLocal }) => {
-  handGroup.scale.setScalar(2.4);
-  // Reach sideways into the mass, thumb pointing away from the camera.
-  // Map the hand's local axes to world: fingers (+Y) -> +X (into the mass),
-  // palm (+Z) -> +Y (palm up), thumb (on -X) -> -Z (away from the camera).
-  const basis = new THREE.Matrix4().makeBasis(
-    new THREE.Vector3(0, 0, 1),
-    new THREE.Vector3(1, 0, 0),
-    new THREE.Vector3(0, 1, 0),
-  );
-  handGroup.quaternion.setFromRotationMatrix(basis);
-  handGroup.position.set(cc0.x - 1.15, cc0.y - 0.15, cc0.z + 0.1);
-  scene.add(handGroup);
-  handGroup.updateMatrixWorld(true);
-  engine.systems[0].reachPoint = handReachLocal.clone().applyMatrix4(handGroup.matrixWorld);
-}).catch((e) => console.error('hand load failed', e));
 
 // ---- Navigation state ----
 let current = 0;

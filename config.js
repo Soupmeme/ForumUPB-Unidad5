@@ -25,7 +25,7 @@ export const config = {
 
   // ---- Station particle systems (shared engine, decision D4) ----
   station: {
-    particles: 260,        // particles per station system
+    particles: 360,        // particles per station system
     cloudRadius: 1.9,      // base radius of a station's particle cloud
     pointSize: 0.075,
     idleIntensity: 0.22,   // energy of non-active stations (still visible, calmer)
