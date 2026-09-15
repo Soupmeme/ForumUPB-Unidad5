@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Museo del Relevo</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <!-- HUD: screen-space text layer, always legible (decision D3) -->
+  <div id="hud">
+    <div id="hud-top">
+      <div id="counter"><span id="counter-num">1</span> / <span id="counter-total">13</span></div>
+    </div>
+
+    <div id="hud-center">
+      <div id="photo-tag" hidden></div>
+      <div id="station-text"></div>
+      <div id="station-handle"></div>
+      <div id="qr-block" hidden>
+        <div class="qr-item"><div class="qr-box" id="qr-memories"></div><span>Memorias</span></div>
+        <div class="qr-item"><div class="qr-box" id="qr-social"></div><span>@centrodeeventosupb</span></div>
+      </div>
+    </div>
+
+    <div id="hud-bottom">
+      <div id="progress"><div id="progress-fill"></div></div>
+      <div id="controls-hint">Espacio / &rarr; avanzar &nbsp;·&nbsp; &larr; volver &nbsp;·&nbsp; F pantalla completa &nbsp;·&nbsp; H ayuda &nbsp;·&nbsp; R reiniciar</div>
+    </div>
+  </div>
+
+  <!-- Help overlay -->
+  <div id="help" hidden>
+    <div class="help-card">
+      <h2>El Museo del Relevo</h2>
+      <p>Un recorrido en primera persona. Cada estación es un momento del discurso. Camina el pasillo ascendente estación por estación.</p>
+      <ul>
+        <li><b>Espacio</b> o <b>&rarr;</b> : avanzar a la siguiente estación</li>
+        <li><b>&larr;</b> : volver a la anterior</li>
+        <li><b>F</b> : pantalla completa</li>
+        <li><b>H</b> : mostrar / ocultar esta ayuda</li>
+        <li><b>R</b> : reiniciar el recorrido</li>
+      </ul>
+      <p class="help-foot">En móvil: desliza a izquierda / derecha.</p>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

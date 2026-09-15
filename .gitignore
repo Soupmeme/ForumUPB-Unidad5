@@ -1,0 +1,11 @@
+# Dependencies (Three.js is vendored under vendor/ on purpose, so it is NOT ignored)
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+
+# Build / temp
+dist/
+.cache/
