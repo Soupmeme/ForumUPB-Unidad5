@@ -846,23 +846,26 @@ const handlers = {
     }
   },
 
-  // Station 7, take three: "El talento crece a la velocidad de la confianza."
-  // Kiwi's correction: not two separate webs pulsating in sync (that read as
-  // "side by side", not "together") -- ONE single structure that both
-  // generations coalesce into. That coalescing IS the entire premise of
-  // trust. So: one shared web, spokes alternating amber/jade (interwoven,
-  // not split left/right), each thread fading from its generation's color
-  // at the rim toward `hot` at the hub -- the closer to the shared center,
-  // the more merged; the further out, the more each side's own identity
-  // still shows. The rings (which cross alternating spokes) pick up both
-  // colors naturally via per-vertex gradients, reading as literally woven
-  // together.
+  // Station 7, take four: "El talento crece a la velocidad de la confianza."
+  // D29 built the right END state (one shared, interwoven web) but nothing
+  // actually happened -- Kiwi wants the ARRIVAL itself watched, or the
+  // "growth" in the text has nothing to show for it. So this is now a real
+  // one-shot animation (sys.activeTime, D18's technique): it STARTS as two
+  // distinct, separate, organic masses -- elder left, young right, exactly
+  // like station 1's opening image -- and each particle migrates from there
+  // into its assigned spot in the single shared web, staggered per-particle
+  // (motion-study.md's own device from station 5) so the reassembly cascades
+  // rather than snapping all at once. The connecting threads are visible
+  // throughout, stretching and pulling taut as the masses migrate -- the
+  // weaving-together IS the transformation, not a cut between two states.
+  // Once assembled, it settles into D29's shared tiny pulse.
   'trust-grows'(sys, elapsed) {
     const pos = sys.points.geometry.attributes.position.array;
     const col = sys.points.geometry.attributes.color.array;
     const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
     const e = sys.params.energy;
     const c = new THREE.Color();
+    const c2 = new THREE.Color();
 
     if (!sys._trustSetup) {
       sys._trustSetup = true;
@@ -870,6 +873,7 @@ const handlers = {
       sys._trustSpokes = spokes;
       sys._trustShells = shells;
       sys._trustSpokeGen = Array.from({ length: spokes }, (_, s) => s % 2); // alternating: 0=elder, 1=young
+      sys._trustProgress = new Float32Array(sys.n); // written per-particle, read by the bonds pass
       const idx = (spoke, shell) => shell * spokes + spoke;
 
       const bonds = []; // [a, b] -- straight; color comes from each vertex's own spoke
@@ -882,52 +886,80 @@ const handlers = {
     }
 
     const spokes = sys._trustSpokes, shells = sys._trustShells, spokeGen = sys._trustSpokeGen;
-    const t = sys.activeTime;
-    const growth = smoothstep(0.3, 5.5, t); // grows once, measured, then holds
+    const progressArr = sys._trustProgress;
     const baseRadius = config.station.cloudRadius * 0.5;
-    const grownRadius = baseRadius * (0.15 + growth * 0.95);
     const domeDepth = 0.5;
+    const gapHalf = 1.6; // where the two starting masses sit, elder left / young right
 
     const rot = elapsed * 0.05;
     const heartbeat = 1 + 0.035 * Math.sin(elapsed * 1.1); // tiny, shared -- one structure, one pulse
     const pulse = 0.9 + 0.1 * Math.sin(elapsed * 1.1);
 
-    // Color at a point along a spoke: fades from `hot` at the hub (fully
-    // merged) to that spoke's own generation color at the rim (still
-    // recognizably theirs) -- the coalescing rendered as a literal gradient.
+    // Color at a point along a spoke once assembled: fades from `hot` at the
+    // hub (fully merged) to that spoke's own generation color at the rim.
     const colorAt = (spoke, shellFrac, out) => {
       const gen = spokeGen[spoke] === 0 ? elder : young;
       out.copy(hot).lerp(gen, shellFrac);
     };
 
+    // Per-particle staggered arrival: hold as two masses briefly, then each
+    // particle migrates on its own schedule (spread across ~3s of starts,
+    // each taking ~1.8s), so the web assembles as a cascade, not a snap.
+    const holdStart = 0.8, staggerWindow = 3.0, travelDur = 1.8;
+
     for (let i = 0; i < sys.n; i++) {
       const spoke = i % spokes, shell = Math.floor(i / spokes) % shells;
       const shellFrac = (shell + 1) / shells;
+      const gen = spokeGen[spoke];
 
-      const rJit = 1 + (sys.baseR[i] - 0.7) * 0.06; // organic, not ruler-straight
+      const tStart = holdStart + (sys.phase[i] / (Math.PI * 2)) * staggerWindow;
+      const progress = smoothstep(tStart, tStart + travelDur, sys.activeTime);
+      progressArr[i] = progress;
+
+      // End position: the ordered web spot.
+      const rJit = 1 + (sys.baseR[i] - 0.7) * 0.06;
       const aJit = (sys.phase[i] - Math.PI) * 0.01;
       const angle = (spoke / spokes) * Math.PI * 2 + rot + aJit;
-      const r = grownRadius * shellFrac * heartbeat * rJit;
+      const endR = baseRadius * shellFrac * heartbeat * rJit;
+      const ex = cx + Math.cos(angle) * endR;
+      const ey = cy + Math.sin(angle) * endR;
+      const ez = cz + domeDepth * (1 - shellFrac);
 
-      pos[i * 3 + 0] = cx + Math.cos(angle) * r;
-      pos[i * 3 + 1] = cy + Math.sin(angle) * r;
-      pos[i * 3 + 2] = cz + domeDepth * (1 - shellFrac) * growth;
+      // Start position: a loose organic mass, elder left / young right --
+      // the same two-generation image station 1 opened with.
+      const side = gen === 0 ? -1 : 1;
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const cloudR = baseRadius * 0.85 * sys.baseR[i];
+      const sx = cx + side * gapHalf + dx * cloudR;
+      const sy = cy + dy * cloudR;
+      const sz = cz + dz * cloudR;
 
-      colorAt(spoke, shellFrac, c);
+      pos[i * 3 + 0] = sx + (ex - sx) * progress;
+      pos[i * 3 + 1] = sy + (ey - sy) * progress;
+      pos[i * 3 + 2] = sz + (ez - sz) * progress;
+
+      // Color travels too: pure generation color while separate, blending
+      // toward the merged hub gradient only as each particle arrives.
+      c.copy(gen === 0 ? elder : young);
+      colorAt(spoke, shellFrac, c2);
+      c.lerp(c2, progress);
       const b = (0.32 + e * 0.28) * pulse;
       col[i * 3 + 0] = c.r * b;
       col[i * 3 + 1] = c.g * b;
       col[i * 3 + 2] = c.b * b;
     }
 
+    // Threads stretch taut as the masses migrate -- dim while still
+    // separate, brightening to full as both ends settle into place.
     const bpos = sys.bonds.geometry.attributes.position.array;
     const bcol = sys.bonds.geometry.attributes.color.array;
-    const v = (0.16 + growth * 0.2) * pulse;
     let k = 0;
     for (const [a, b] of sys._trustBonds) {
       const p0 = k * 6, p1 = k * 6 + 3; k++;
       bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
       bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      const avgProgress = (progressArr[a] + progressArr[b]) / 2;
+      const v = (0.05 + avgProgress * 0.31) * pulse;
       colorAt(a % spokes, (Math.floor(a / spokes) % shells + 1) / shells, c);
       bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
       colorAt(b % spokes, (Math.floor(b / spokes) % shells + 1) / shells, c);
