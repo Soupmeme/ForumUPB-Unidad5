@@ -16,6 +16,12 @@ const elder = new THREE.Color(config.palette.accentElder);
 const young = new THREE.Color(config.palette.accentYoung);
 const hot = new THREE.Color(0xfff2d0);
 
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+const smoothstep = (edge0, edge1, v) => {
+  const t = clamp01((v - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
 // One station's particle cloud: a fixed pool that reconfigures (it does not
 // birth/die). Persistent particles read as transformation, which fits a
 // museum exhibit that restates the same matter under a new meaning.
@@ -54,6 +60,22 @@ class StationSystem {
     this.points = new THREE.Points(g, m);
     scene.add(this.points);
 
+    // Optional connective "bonds": explicit relationship lines between fixed
+    // particle pairs, not inferred from proximity (motion-study.md #2). A
+    // general capability every state may opt into; states that don't use it
+    // leave the draw range at 0, so nothing renders and nothing costs extra.
+    const bondsMax = config.station.bondsMax;
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bondsMax * 2 * 3), 3));
+    bg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(bondsMax * 2 * 3), 3));
+    bg.setDrawRange(0, 0);
+    const bm = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.9,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.bonds = new THREE.LineSegments(bg, bm);
+    scene.add(this.bonds);
+
     // Eased params (the "knobs" that move toward each moment's targets).
     this.params = { energy: config.station.idleIntensity, accent: station.accent ?? 0.5 };
     this.target = { energy: config.station.idleIntensity, accent: station.accent ?? 0.5 };
@@ -75,6 +97,8 @@ class StationSystem {
 
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.color.needsUpdate = true;
+    this.bonds.geometry.attributes.position.needsUpdate = true;
+    this.bonds.geometry.attributes.color.needsUpdate = true;
   }
 }
 
@@ -111,51 +135,137 @@ const handlers = {
   },
 
   // Station 1 (the thesis): two distinct masses, an elder (amber) and a young
-  // (jade), each breathing on its own, their inner edges reaching ever so
-  // softly toward each other across a gap and then withdrawing. They never
-  // touch: the connection is real but not yet made (the advantage nobody takes).
+  // (jade), reaching toward each other across a gap and withdrawing. They
+  // never touch: the connection is real but not yet made (the advantage
+  // nobody takes). Informed by motion-study.md:
+  //  - the two sides differ in TEXTURE, not just color (#4): elder is
+  //    denser, tighter, quieter (settled); young is sparser, wider, more
+  //    turbulent (still finding its shape).
+  //  - explicit "bonds" (#2/#3): a dense fixed lattice inside the elder mass
+  //    (established structure), a few loose bonds inside the young mass, and
+  //    a handful of bridge attempts between the two that flicker and never
+  //    fully connect -- the relationship itself is drawn, not implied.
+  //  - the reach is a three-act envelope (#6: build -> reach -> retreat)
+  //    over a fixed cycle, not a continuous sine.
   'twin-reach'(sys, elapsed) {
     const pos = sys.points.geometry.attributes.position.array;
     const col = sys.points.geometry.attributes.color.array;
-    const e = sys.params.energy;
     const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
-    const gapHalf = 1.75;                      // distance of each mass from center
+    const gapHalf = 1.75;
     const cr = config.station.cloudRadius * 0.5;
-    const breatheL = 0.5 + 0.5 * Math.sin(elapsed * 0.95);
-    const breatheR = 0.5 + 0.5 * Math.sin(elapsed * 0.95 + 0.9); // out of phase
-    const reach = 0.5 + 0.5 * Math.sin(elapsed * 0.45);          // slow, soft
     const half = sys.n >> 1;
     const c = new THREE.Color();
 
+    // One-time setup: which particles face the gap (for bridge attempts),
+    // and the fixed relationship pairs -- computed once, reused every frame.
+    if (!sys._twinSetup) {
+      sys._twinSetup = true;
+      const innermost = (from, to, side) => {
+        const scored = [];
+        for (let i = from; i < to; i++) scored.push([i, sys.baseDir[i * 3 + 0] * -side]);
+        scored.sort((a, b) => b[1] - a[1]);
+        return scored.slice(0, 10).map((p) => p[0]);
+      };
+      const innerLeft = innermost(0, half, -1);
+      const innerRight = innermost(half, sys.n, 1);
+
+      const pairs = [];
+      const denseCount = 42, sparseCount = 9, bridgeCount = 7;
+      for (let k = 0; k < denseCount; k++) {
+        const a = (k * 7) % half, b = (k * 7 + 17) % half;
+        if (a !== b) pairs.push([a, b, 'elder']);
+      }
+      for (let k = 0; k < sparseCount; k++) {
+        const span = sys.n - half;
+        const a = half + (k * 13) % span, b = half + (k * 13 + 31) % span;
+        if (a !== b) pairs.push([a, b, 'young']);
+      }
+      for (let k = 0; k < bridgeCount; k++) {
+        pairs.push([innerLeft[k % innerLeft.length], innerRight[(k * 3) % innerRight.length], 'bridge']);
+      }
+      sys._twinBonds = pairs;
+      sys.bonds.geometry.setDrawRange(0, pairs.length * 2);
+    }
+
+    // Three-act cycle: build tension, reach toward the gap, retreat.
+    const cycleDur = 7.5;
+    const cyclePhase = ((elapsed % cycleDur) + cycleDur) % cycleDur / cycleDur;
+    const rising = smoothstep(0.22, 0.46, cyclePhase);
+    const falling = 1 - smoothstep(0.62, 0.94, cyclePhase);
+    const reachEnvelope = Math.min(rising, falling);
+
+    const breatheL = 0.5 + 0.5 * Math.sin(elapsed * 0.8);
+    const breatheR = 0.5 + 0.5 * Math.sin(elapsed * 1.3 + 0.9);
+
     for (let i = 0; i < sys.n; i++) {
       const side = i < half ? -1 : 1;          // -1 = elder (left), +1 = young (right)
-      const breathe = side < 0 ? breatheL : breatheR;
-      const rot = elapsed * 0.1 * -side;        // gentle counter-rotation per mass
+      const isElder = side < 0;
+      const breathe = isElder ? breatheL : breatheR;
+      const rot = elapsed * (isElder ? 0.06 : 0.17) * -side; // young turns faster, livelier
       const cs = Math.cos(rot), sn = Math.sin(rot);
       const dx = sys.baseDir[i * 3 + 0];
       const dy = sys.baseDir[i * 3 + 1];
       const dz = sys.baseDir[i * 3 + 2];
       const rx = dx * cs - dz * sn;
       const rz = dx * sn + dz * cs;
-      const r = cr * sys.baseR[i] * (0.72 + 0.2 * breathe + e * 0.12);
+
+      // Texture: elder tighter and calmer; young wider with individual
+      // turbulence on top of the shared breathing.
+      const spread = isElder ? 0.56 : 0.88;
+      const breatheAmp = isElder ? 0.12 : 0.26;
+      let r = cr * sys.baseR[i] * (spread + breatheAmp * breathe);
+      if (!isElder) r += Math.sin(elapsed * 1.8 + sys.phase[i]) * 0.05;
+
       let px = cx + side * gapHalf + rx * r;
-      let py = cy + dy * r;
+      let py = cy + dy * r + (isElder ? 0 : Math.sin(elapsed * 1.1 + sys.phase[i]) * 0.04);
       let pz = cz + rz * r;
 
-      // Inner-facing particles stretch toward the gap, softly, then relax.
-      const innerness = Math.max(0, rx * -side); // 1 where the point faces the other mass
-      const g = innerness * reach;
-      px += (cx - px) * (g * 0.3);              // reach softly, keep a gap
+      // Inner-facing particles stretch toward the gap during the reach act.
+      const innerness = Math.max(0, rx * -side);
+      const g = innerness * reachEnvelope;
+      px += (cx - px) * (g * 0.32);
 
       pos[i * 3 + 0] = px;
       pos[i * 3 + 1] = py;
       pos[i * 3 + 2] = pz;
 
-      c.copy(side < 0 ? elder : young).lerp(hot, g * 0.32);
-      const b = 0.4 + 0.3 * breathe + g * 0.26;
+      c.copy(isElder ? elder : young).lerp(hot, g * 0.3);
+      const flicker = isElder ? 1 : 0.85 + 0.15 * Math.sin(elapsed * 3 + sys.phase[i]);
+      const b = (isElder ? 0.42 + 0.18 * breathe : 0.34 + 0.3 * breathe) * flicker + g * 0.22;
       col[i * 3 + 0] = c.r * b;
       col[i * 3 + 1] = c.g * b;
       col[i * 3 + 2] = c.b * b;
+    }
+
+    // Bonds: read this frame's already-updated particle positions.
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let k = 0; k < sys._twinBonds.length; k++) {
+      const [a, b, kind] = sys._twinBonds[k];
+      const p0 = k * 6, p1 = k * 6 + 3;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+
+      let br, bgc, bb;
+      if (kind === 'elder') {
+        // A dense, quietly-present lattice: established, doesn't flicker.
+        const v = 0.16 + 0.08 * breatheL;
+        br = elder.r * v; bgc = elder.g * v; bb = elder.b * v;
+      } else if (kind === 'young') {
+        // A few loose bonds that shimmer: still forming its own shape.
+        const flick = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * 1.6 + k));
+        const v = 0.1 + 0.14 * flick;
+        br = young.r * v; bgc = young.g * v; bb = young.b * v;
+      } else {
+        // Bridge attempts: flicker in and out, capped low -- the connection
+        // is tried, glimpsed, but never allowed to fully solidify.
+        const flick = Math.max(0, Math.sin(elapsed * 2.6 + k * 1.7) - 0.35);
+        const v = Math.min(0.45, reachEnvelope * flick * 1.7);
+        c.copy(elder).lerp(young, 0.5).lerp(hot, 0.5);
+        br = c.r * v; bgc = c.g * v; bb = c.b * v;
+      }
+      bcol[p0 + 0] = br; bcol[p0 + 1] = bgc; bcol[p0 + 2] = bb;
+      bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;
     }
   },
 };
