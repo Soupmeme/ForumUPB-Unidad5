@@ -55,7 +55,7 @@ export class HallScene {
   // Center of a station's floating particle cloud (above the plinth).
   cloudCenter(i) {
     const z = this.stationZ(i);
-    return new THREE.Vector3(0, this.floorY(z) + this.plinthHeight + 1.6, z);
+    return new THREE.Vector3(0, this.floorY(z) + this.plinthHeight + 1.3, z);
   }
 
   // Camera stand + look target for a station. The look point sits between the
@@ -64,7 +64,7 @@ export class HallScene {
     const z = this.stationZ(i);
     const standZ = z + config.camera.standBack;
     const pos = new THREE.Vector3(0, this.floorY(standZ) + config.camera.eyeHeight, standZ);
-    const look = new THREE.Vector3(0, this.floorY(z) + 2.5, z + 0.6);
+    const look = new THREE.Vector3(0, this.floorY(z) + 2.7, z + 0.6);
     return { pos, look };
   }
 
@@ -134,14 +134,15 @@ export class HallScene {
       // words as real in-world text (decision D3, revised). Bronze frame is
       // lit; the text plane is unlit so lighting cannot reduce contrast.
       const panel = new THREE.Group();
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.6, 0.14), frameMat);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.0, 0.14), frameMat);
       const textPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(4.2, 2.4),
+        new THREE.PlaneGeometry(3.25, 1.8),
         new THREE.MeshBasicMaterial({ color: 0x0d1116 }),
       );
       textPlane.position.z = 0.08;
       panel.add(frame, textPlane);
-      panel.position.set(0, fy + 1.5, z + 1.25);
+      // A smaller label that sits low in front, UNDER the exhibit on the plinth.
+      panel.position.set(0, fy + 1.15, z + 1.35);
       panel.rotation.x = -0.12; // lean the top back so it faces the raised camera
       this.group.add(panel);
       this.labels.push(textPlane);
