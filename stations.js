@@ -73,7 +73,7 @@ export const stations = [
   },
   {
     slide: 6,
-    state: 'placeholder',
+    state: 'community-huddle',
     intensity: 0.7,
     accent: 0.45,
     text: [
