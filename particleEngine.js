@@ -504,6 +504,11 @@ const handlers = {
       const groupSize = Math.floor(sys.n / 3);
       const ranges = [[0, groupSize], [groupSize, groupSize * 2], [groupSize * 2, sys.n]];
       sys._triadRanges = ranges;
+      // Only a fraction of each cluster actually renders (the rest are
+      // driven invisible below) -- a small spark of a few dozen points per
+      // force, deliberately NOT the same weight as a generation's mass, so
+      // the triad doesn't read as "two more generations plus one."
+      sys._triadVisible = 42;
 
       const ax = 0.95, ay = 0.85;
       const anchors = [
@@ -513,20 +518,25 @@ const handlers = {
       ];
       sys._triadAnchors = anchors;
 
-      // Subtle tints of institution-indigo, one per cluster -- Industria
-      // shifted warmer, Ciudad shifted cooler, Academia stays pure.
+      // Distinct tints of institution-indigo -- pushed on hue AND saturation
+      // AND lightness together, not just a small hue nudge (which reads as
+      // near-identical on a monitor). Industria: brighter, more saturated,
+      // leaning magenta-violet ("energetic"). Ciudad: darker, more muted,
+      // leaning blue ("steel, quieter"). Academia stays the pure anchor.
       const hsl = { h: 0, s: 0, l: 0 };
       institution.getHSL(hsl);
-      const warm = new THREE.Color().setHSL(hsl.h + 0.035, hsl.s * 0.92, Math.min(0.8, hsl.l * 1.1));
-      const cool = new THREE.Color().setHSL(hsl.h - 0.035, hsl.s * 0.92, Math.min(0.8, hsl.l * 1.1));
+      const warm = new THREE.Color().setHSL(clamp01(hsl.h + 0.07), clamp01(hsl.s * 1.3), clamp01(hsl.l * 1.4));
+      const cool = new THREE.Color().setHSL(clamp01(hsl.h - 0.06), clamp01(hsl.s * 0.6), clamp01(hsl.l * 0.55));
       sys._triadTints = [institution, warm, cool];
 
       // The particle in each cluster that faces a given neighbor, used to
       // anchor that pairwise bond -- the same "innermost" technique as
       // station 1's bridges, so the triangle connects real, chosen particles.
+      // Searched only within the VISIBLE subset, so the bond always lands on
+      // an actual spark, not an invisible point.
       const facing = (range, dir) => {
         let best = -1, bestScore = -Infinity;
-        for (let i = range[0]; i < range[1]; i++) {
+        for (let i = range[0]; i < range[0] + sys._triadVisible; i++) {
           const score = sys.baseDir[i * 3 + 0] * dir.x + sys.baseDir[i * 3 + 1] * dir.y + sys.baseDir[i * 3 + 2] * dir.z;
           if (score > bestScore) { bestScore = score; best = i; }
         }
@@ -540,11 +550,11 @@ const handlers = {
       sys._triadTriangle = triangle;
 
       // A little internal texture per cluster: fixed-pair bonds, same
-      // density for all three (equal treatment).
+      // density for all three (equal treatment), within the visible subset.
       const internal = [];
       for (let g = 0; g < 3; g++) {
-        const [from, to] = ranges[g];
-        const span = to - from;
+        const from = ranges[g][0];
+        const span = sys._triadVisible;
         for (let k = 0; k < 12; k++) {
           const a = from + (k * 11) % span, b = from + (k * 11 + 23) % span;
           if (a !== b) internal.push([a, b, g]);
@@ -555,6 +565,7 @@ const handlers = {
     }
 
     const ranges = sys._triadRanges, anchors = sys._triadAnchors, tints = sys._triadTints;
+    const visible = sys._triadVisible;
     const clusterRadius = config.station.cloudRadius * 0.34;
     const rot = elapsed * 0.12; // one shared rotation -- same for every cluster
     const cs = Math.cos(rot), sn = Math.sin(rot);
@@ -574,10 +585,17 @@ const handlers = {
         pos[i * 3 + 1] = cy + anchor.y + dy * r;
         pos[i * 3 + 2] = cz + anchor.z + rz * r;
 
-        const b = 0.36 + e * 0.28 + breathe * 0.1;
-        col[i * 3 + 0] = tint.r * b;
-        col[i * 3 + 1] = tint.g * b;
-        col[i * 3 + 2] = tint.b * b;
+        // Only the first `visible` particles of each cluster actually show:
+        // the rest stay in the pool (bonds may still reference them) but
+        // render at zero brightness, keeping the triad's footprint small.
+        if (i - from < visible) {
+          const b = 0.36 + e * 0.28 + breathe * 0.1;
+          col[i * 3 + 0] = tint.r * b;
+          col[i * 3 + 1] = tint.g * b;
+          col[i * 3 + 2] = tint.b * b;
+        } else {
+          col[i * 3 + 0] = 0; col[i * 3 + 1] = 0; col[i * 3 + 2] = 0;
+        }
       }
     }
 

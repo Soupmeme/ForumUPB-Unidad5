@@ -128,5 +128,12 @@ Tratamiento igualitario deliberado: los tres racimos comparten exactamente el mi
 
 Implementacion (`triad-forces`): cada racimo usa la tecnica de "particula que mira hacia el vecino" (la misma de los zarcillos de la estacion 1, D16) para elegir el vertice real del triangulo en cada racimo -- el vinculo conecta particulas reales orientadas hacia el otro racimo, no puntos sinteticos. Cada racimo tambien tiene su propia reticula interna liviana (mismo conteo para las tres, D19-consistente).
 
+### D21 — Estacion 4, dos ajustes: menos particulas visibles, colores mas distintos
+Kiwi senalo dos problemas tras ver la estacion 4 en pantalla: (1) cada racimo tenia 120 particulas visibles, el mismo orden de magnitud que las masas de la estacion 1 (180 por lado), asi que sin querer comunicaba "otra generacion" en vez de "una fuerza mas chica"; (2) los tres tintes de indigo (variando solo el matiz en +-3.5°) se veian casi identicos en pantalla, aunque en teoria fueran "distintos".
+
+Correcciones en `triad-forces`:
+- Cada racimo ahora solo muestra 42 particulas (`sys._triadVisible`), el resto del grupo se deja en el pool pero se pinta en negro (invisible con blending aditivo) -- una chispa, no una masa. Los vinculos (el triangulo y la textura interna) se buscan solo dentro del subconjunto visible, para que ninguna linea termine en un punto invisible.
+- Los tintes ahora se separan por matiz, saturacion Y luminosidad a la vez (no solo matiz): Industria sube matiz +7°, satura 1.3x, aclara 1.4x (un violeta-magenta mas vivo, "energico"); Ciudad baja matiz -6°, satura 0.6x, oscurece a 0.55x (un azul-violeta apagado, "acero, mas callado"). Academia se queda en el indigo puro sin modificar. La separacion en saturacion/luminosidad es lo que realmente distingue los colores en pantalla -- un cambio de matiz de pocos grados por si solo no bastaba.
+
 ## Pendiente de autoría por estación (iterativo, con Kiwi)
 El shell usa un manejador de partículas genérico ("placeholder") en las 13 estaciones, variando solo la intensidad para demostrar el ruteo de datos de punta a punta. El significado real de cada estación (su `state`, sus parámetros y su sistema de partículas propio) se autora estación por estación DESPUÉS de que el shell funcione completo. Vocabulario de parámetros propuesto para esa fase (a confirmar/revisar por Kiwi): cohesion, dispersion, flow, convergence, emergence.
