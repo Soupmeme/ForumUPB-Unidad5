@@ -2,6 +2,8 @@
 
 Presentación web generativa para la Unidad 5 (Simulación para Sistemas Interactivos, UPB). Un recorrido en primera persona por un museo: cada uno de los 13 momentos del guion del cliente es una estación en un pasillo ascendente, con un pilar, una placa (las palabras exactas del cliente) y un sistema de partículas que expresa el significado de ese momento.
 
+**Ver en vivo:** https://soupmeme.github.io/ForumUPB-Unidad5/
+
 El concepto, las decisiones y lo que se importa o no del referente están en [`decisions.md`](decisions.md). El brief completo está en [`unit5-handoff.md`](unit5-handoff.md).
 
 ## Correr
@@ -40,4 +42,4 @@ Contenido y render están desacoplados (esa separación es lo que obliga a que t
 
 ## Estado
 
-Shell funcional de punta a punta con arte de partículas genérico ("placeholder") en las 13 estaciones. La autoría del sistema de partículas propio de cada estación es la siguiente fase, iterativa.
+Shell funcional de punta a punta. Estaciones 1 a 7 tienen sistema de partículas propio, autorado y aprobado iterativamente; las estaciones 8 a 13 siguen con arte genérico ("placeholder") a la espera de autoría.
