@@ -83,17 +83,22 @@ function buildFlutedCylinderGeometry(radius, height, fluteCount, fluteDepth, poi
     const n = new THREE.Vector3().crossVectors(ab, ac).normalize();
     for (const p of [a, b, c]) { positions.push(p.x, p.y, p.z); normals.push(n.x, n.y, n.z); }
   };
+  // Vertex order here determines outward-vs-inward winding (Three.js culls
+  // by winding, not by the stored normal). cos/sin with increasing theta
+  // traces the ring so that (bottom[i], bottom[j], top[i]) winds INWARD --
+  // verified by hand via the cross product -- so every triangle below is
+  // built in the reversed order to face outward instead.
   for (let i = 0; i < angularSteps; i++) {
     const j = (i + 1) % angularSteps;
-    pushTri(bottom[i], bottom[j], top[i]);
-    pushTri(top[i], bottom[j], top[j]);
+    pushTri(bottom[j], bottom[i], top[i]);
+    pushTri(top[j], bottom[j], top[i]);
   }
   // Cap the top so the capital core sitting on it doesn't reveal a hollow
   // tube interior (the base moulding already hides the bottom from view).
   const topCenter = new THREE.Vector3(0, height, 0);
   for (let i = 0; i < angularSteps; i++) {
     const j = (i + 1) % angularSteps;
-    pushTri(top[i], top[j], topCenter);
+    pushTri(top[j], top[i], topCenter);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -214,8 +219,11 @@ export function createColumnModel() {
   parts.push({ geometry: baseGeo, matrix: mat4(0, y, 0), color: STONE });
   y += baseH;
 
-  // Shaft (macro, repetitionSystem: 20 flutes).
-  const shaftH = 1.45, shaftR = 0.5;
+  // Shaft (macro, repetitionSystem: 20 flutes). Taller than a literal
+  // scale-down of the old 2.2-unit plinth height so the capital clears the
+  // label panel's top edge (panel spans fy+0.15..fy+2.15) with a real
+  // visible margin, rather than barely peeking above it.
+  const shaftH = 1.85, shaftR = 0.5;
   parts.push({
     geometry: buildFlutedCylinderGeometry(shaftR, shaftH, 20, 0.045),
     matrix: mat4(0, y, 0),
