@@ -97,7 +97,7 @@ export const stations = [
   },
   {
     slide: 8,
-    state: 'placeholder',
+    state: 'path-branches',
     intensity: 0.7,
     accent: 0.6,
     photo: 4,

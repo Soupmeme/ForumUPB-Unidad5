@@ -966,6 +966,174 @@ const handlers = {
       bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
     }
   },
+
+  // Station 8: "La experiencia construye el camino. Las nuevas generaciones
+  // descubren nuevas rutas." Studied from the referente's own "routes" state
+  // (its moment id is literally "nuevas-rutas"): a handful of individually
+  // seeded lanes, each a curved bezier from a wide point toward a shared
+  // center, looping continuously with a bright traveling bead -- discrete,
+  // legible paths, never one undifferentiated mass. We take that TECHNIQUE
+  // (fixed lanes, curved travel, a traveling highlight) but invert the
+  // geometry for our two clauses: one already-finished trunk path (elder --
+  // "la experiencia" already built this, so it is simply whole and calm the
+  // moment the station activates, nothing to watch it become) and several
+  // new branches forking off real points on that trunk (young), each one
+  // visibly growing outward when the station activates (sys.activeTime,
+  // D18), staggered branch-to-branch and particle-to-particle along its own
+  // length (motion-study's device, reused from stations 5-7) -- discovery as
+  // something that visibly happens, not a finished state. Once a branch has
+  // grown in, a traveling glow keeps sweeping along it on a loop: the
+  // discovering doesn't stop, it keeps going for as long as the station holds.
+  'path-branches'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const c = new THREE.Color();
+    const branchCount = 6;
+
+    if (!sys._pathSetup) {
+      sys._pathSetup = true;
+      const trunkCount = 72;
+      const perBranch = Math.floor((sys.n - trunkCount) / branchCount);
+      sys._pathTrunkCount = trunkCount;
+      sys._pathPerBranch = perBranch;
+
+      // The trunk: a single winding curve across the cloud, already whole.
+      const trunkPoint = (t) => new THREE.Vector3(
+        (t - 0.5) * config.station.cloudRadius * 1.7,
+        Math.sin(t * Math.PI * 1.6 + 0.4) * config.station.cloudRadius * 0.28,
+        Math.cos(t * Math.PI * 1.1) * config.station.cloudRadius * 0.16,
+      );
+      sys._pathTrunkPoint = trunkPoint;
+
+      // Branch points spread along the trunk, each with its own fixed
+      // direction and reach -- new routes, each going somewhere the trunk
+      // itself doesn't, forking from a real, chosen trunk particle.
+      const branches = [];
+      for (let b = 0; b < branchCount; b++) {
+        const anchorT = 0.14 + (b / (branchCount - 1)) * 0.72;
+        const anchorIdx = Math.round(anchorT * (trunkCount - 1));
+        const anchorPos = trunkPoint(anchorIdx / (trunkCount - 1));
+        const dirAngle = (b / branchCount) * Math.PI * 2 + (b % 2 === 0 ? 0.5 : -0.5);
+        const updown = b % 2 === 0 ? 1 : -1;
+        const dir = new THREE.Vector3(Math.sin(dirAngle) * 0.5, updown, Math.cos(dirAngle) * 0.6).normalize();
+        const reach = config.station.cloudRadius * (0.45 + (b % 3) * 0.12);
+        const tip = anchorPos.clone().addScaledVector(dir, reach);
+        const control = anchorPos.clone().lerp(tip, 0.5).addScaledVector(
+          new THREE.Vector3(dir.z, 0, -dir.x), config.station.cloudRadius * 0.3,
+        );
+        branches.push({ anchorIdx, anchorPos, control, tip, startIdx: trunkCount + b * perBranch });
+      }
+      sys._pathBranches = branches;
+
+      // Bonds: the trunk itself, each branch's own thread, and one bond per
+      // branch marking exactly where it forks -- a real, chosen relation,
+      // not implied by nearby positions.
+      const bonds = [];
+      for (let i = 0; i + 2 < trunkCount; i += 2) bonds.push([i, i + 2, 'trunk']);
+      // Branch stride is wider than the trunk's: 48 points on a curve this
+      // short, drawn additively, overlap on screen and wash out toward white
+      // well before any single point's own brightness would. Thinning both
+      // the visible points AND their bonds down to every 3rd index (below)
+      // is what actually fixes that, not a dimmer color.
+      for (const br of branches) {
+        for (let j = 0; j + 3 < perBranch; j += 3) bonds.push([br.startIdx + j, br.startIdx + j + 3, 'branch']);
+        bonds.push([br.anchorIdx, br.startIdx, 'fork']);
+      }
+      sys._pathBonds = bonds;
+      sys._pathProgress = new Float32Array(sys.n);
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
+    }
+
+    const trunkCount = sys._pathTrunkCount, perBranch = sys._pathPerBranch;
+    const branches = sys._pathBranches, trunkPoint = sys._pathTrunkPoint;
+    const progressArr = sys._pathProgress;
+
+    // The trunk: present in full the instant the station is active, calm
+    // and barely moving -- it was already built, there's nothing to watch.
+    for (let i = 0; i < trunkCount; i++) {
+      const t = i / (trunkCount - 1);
+      const p = trunkPoint(t);
+      const wob = Math.sin(elapsed * 0.4 + sys.phase[i]) * 0.015;
+      pos[i * 3 + 0] = cx + p.x;
+      pos[i * 3 + 1] = cy + p.y + wob;
+      pos[i * 3 + 2] = cz + p.z;
+      const tb = 0.4 + e * 0.22;
+      col[i * 3 + 0] = elder.r * tb;
+      col[i * 3 + 1] = elder.g * tb;
+      col[i * 3 + 2] = elder.b * tb;
+      progressArr[i] = 1;
+    }
+
+    // Branches: each grows outward from its fork point once the station
+    // activates, staggered branch-to-branch and, within a branch, particle
+    // by particle -- so the extension itself is watched, not just its result.
+    const branchStagger = 0.85, branchGrowSpan = 1.6, travelDur = 1.1, holdStart = 0.6;
+    for (let bi = 0; bi < branches.length; bi++) {
+      const br = branches[bi];
+      const brStart = holdStart + bi * branchStagger;
+      for (let j = 0; j < perBranch; j++) {
+        const idx = br.startIdx + j;
+        const frac = j / Math.max(1, perBranch - 1);
+        const tStart = brStart + frac * branchGrowSpan;
+        const progress = smoothstep(tStart, tStart + travelDur, sys.activeTime);
+        progressArr[idx] = progress;
+
+        const curveX = quadPoint(br.anchorPos.x, br.control.x, br.tip.x, frac);
+        const curveY = quadPoint(br.anchorPos.y, br.control.y, br.tip.y, frac);
+        const curveZ = quadPoint(br.anchorPos.z, br.control.z, br.tip.z, frac);
+        pos[idx * 3 + 0] = cx + br.anchorPos.x + (curveX - br.anchorPos.x) * progress;
+        pos[idx * 3 + 1] = cy + br.anchorPos.y + (curveY - br.anchorPos.y) * progress;
+        pos[idx * 3 + 2] = cz + br.anchorPos.z + (curveZ - br.anchorPos.z) * progress;
+
+        // Only every 3rd particle actually renders (position still updates
+        // for all of them, so the bonds above -- which only connect those
+        // same visible indices -- read as one continuous thread, not a
+        // gappy one). The rest stay black: real points, invisible weight.
+        if (j % 3 !== 0) { col[idx * 3 + 0] = 0; col[idx * 3 + 1] = 0; col[idx * 3 + 2] = 0; continue; }
+
+        // A traveling glow keeps sweeping along each finished branch, on a
+        // loop -- discovery that keeps happening, not a single finished trip.
+        // Driven by sys.activeTime (not elapsed) so it freezes with the rest
+        // of the station when left, and starts fresh again on reentry.
+        const raw = sys.activeTime * 0.3 + bi * 0.31;
+        const travelT = ((raw % 1) + 1) % 1;
+        let d = Math.abs(frac - travelT);
+        d = Math.min(d, 1 - d);
+        const sweepGlow = Math.max(0, 1 - d * 7) * progress;
+        const arrivalGlow = 1 - progress; // fresh and bright as it lands, settling to jade
+        c.copy(young).lerp(hot, Math.max(sweepGlow, arrivalGlow) * 0.7);
+        const bb = (0.28 + e * 0.26) * (0.4 + progress * 0.5);
+        col[idx * 3 + 0] = c.r * bb;
+        col[idx * 3 + 1] = c.g * bb;
+        col[idx * 3 + 2] = c.b * bb;
+      }
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    let k = 0;
+    for (const [a, b, kind] of sys._pathBonds) {
+      const p0 = k * 6, p1 = k * 6 + 3; k++;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+
+      if (kind === 'trunk') {
+        const v = 0.18 + e * 0.06;
+        bcol[p0 + 0] = elder.r * v; bcol[p0 + 1] = elder.g * v; bcol[p0 + 2] = elder.b * v;
+        bcol[p1 + 0] = elder.r * v; bcol[p1 + 1] = elder.g * v; bcol[p1 + 2] = elder.b * v;
+      } else {
+        // A fork bond runs elder-at-the-trunk to young-at-the-branch: the
+        // color itself shows the handoff, vertex by vertex.
+        const va = 0.06 + progressArr[a] * 0.16, vb = 0.06 + progressArr[b] * 0.16;
+        c.copy(kind === 'fork' ? elder : young);
+        bcol[p0 + 0] = c.r * va; bcol[p0 + 1] = c.g * va; bcol[p0 + 2] = c.b * va;
+        c.copy(young);
+        bcol[p1 + 0] = c.r * vb; bcol[p1 + 1] = c.g * vb; bcol[p1 + 2] = c.b * vb;
+      }
+    }
+  },
 };
 
 export class ParticleEngine {
