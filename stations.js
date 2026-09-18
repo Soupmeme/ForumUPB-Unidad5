@@ -146,7 +146,7 @@ export const stations = [
   },
   {
     slide: 12,
-    state: 'placeholder',
+    state: 'future-builds',
     intensity: 1.0,
     accent: 0.9,
     photo: 5,

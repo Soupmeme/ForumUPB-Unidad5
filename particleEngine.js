@@ -1548,6 +1548,116 @@ const handlers = {
       bcol[p1 + 0] = tint.r * v; bcol[p1 + 1] = tint.g * v; bcol[p1 + 2] = tint.b * v;
     }
   },
+
+  // Station 12: "El futuro no se hereda. Se construye." The referente's own
+  // version of this moment (moment id `futuro-construido`, state "future")
+  // is not its own technique -- it literally reuses "routes" (station 8's
+  // referente equivalent) scaled up: wider reach, faster travel. Nothing new
+  // to study, so this station is ours more than most.
+  //
+  // The line negates one image to affirm another, same shape as station 10:
+  // inheritance (something passed down a single line, unearned) rejected in
+  // favor of construction (assembled, effortful). Station 8 grew from one
+  // trunk and station 10 built between two fixed sides -- this one has NO
+  // single source at all: every particle starts scattered across the whole
+  // cloud (its own independent baseDir, nothing shared, nothing inherited
+  // from a neighbor) and migrates, staggered per-particle (sys.phase, the
+  // device from stations 5-8 and 10), into its place on a single rising
+  // spire -- a structure with no ancestry, only construction. Colored by
+  // origin while apart (each particle keeps its own scattered generation
+  // tint, alternating -- both generations supply raw material, but neither
+  // hands it down as a line), blending into the shared structure's own
+  // gradient as it arrives: a blend of both at the base, warming to `hot`
+  // at the tip -- the part of the future not yet realized.
+  'future-builds'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const c = new THREE.Color(), c2 = new THREE.Color();
+
+    const rings = 12, perRing = 30; // 12 * 30 = sys.n exactly
+    const idx = (ring, slot) => ring * perRing + slot;
+
+    if (!sys._futureSetup) {
+      sys._futureSetup = true;
+      const legSlots = [];
+      for (let k = 0; k < 10; k++) legSlots.push(k * 3); // 10 evenly spaced uprights
+      const ringRows = [0, Math.floor(rings / 2), rings - 1]; // base, waist, tip
+
+      const bonds = [];
+      for (let ring = 0; ring < rings - 1; ring++) {
+        for (const slot of legSlots) bonds.push([idx(ring, slot), idx(ring + 1, slot), 'leg']);
+      }
+      for (const ring of ringRows) {
+        for (let slot = 0; slot < perRing; slot++) bonds.push([idx(ring, slot), idx(ring, (slot + 1) % perRing), 'ring']);
+      }
+      sys._futureBonds = bonds;
+      sys._futureProgress = new Float32Array(sys.n);
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
+    }
+
+    const progressArr = sys._futureProgress;
+    const baseRadius = config.station.cloudRadius * 0.55;
+    const towerHeight = config.station.cloudRadius * 1.3;
+    const holdStart = 0.8, staggerWindow = 3.0, travelDur = 1.8; // stations 5-7's proven pacing
+
+    // The structure's own gradient at a given height: both generations
+    // blended at the base, warming toward `hot` at the tip.
+    const colorAt = (ringFrac, out) => {
+      out.copy(elder).lerp(young, 0.5).lerp(hot, Math.pow(ringFrac, 1.3));
+    };
+
+    for (let i = 0; i < sys.n; i++) {
+      const ring = Math.floor(i / perRing), slot = i % perRing;
+      const ringFrac = ring / (rings - 1);
+
+      const tStart = holdStart + (sys.phase[i] / (Math.PI * 2)) * staggerWindow;
+      const progress = smoothstep(tStart, tStart + travelDur, sys.activeTime);
+      progressArr[i] = progress;
+
+      // Final position: a tapering spire, each ring twisted slightly from
+      // the last so the whole thing reads as under construction, not extruded.
+      const radius = baseRadius * Math.pow(1 - ringFrac, 1.4);
+      const angle = (slot / perRing) * Math.PI * 2 + ring * 0.15;
+      const fx = cx + Math.cos(angle) * radius;
+      const fy = cy - towerHeight * 0.5 + ringFrac * towerHeight;
+      const fz = cz + Math.sin(angle) * radius;
+
+      // Start position: scattered across the whole cloud -- no shared origin.
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const startR = config.station.cloudRadius * sys.baseR[i] * 1.3;
+      const sx = cx + dx * startR, sy = cy + dy * startR, sz = cz + dz * startR;
+
+      pos[i * 3 + 0] = sx + (fx - sx) * progress;
+      pos[i * 3 + 1] = sy + (fy - sy) * progress;
+      pos[i * 3 + 2] = sz + (fz - sz) * progress;
+
+      c.copy(i % 2 === 0 ? elder : young);
+      colorAt(ringFrac, c2);
+      c.lerp(c2, progress);
+      const b = (0.3 + e * 0.3) * (0.35 + progress * 0.55);
+      col[i * 3 + 0] = c.r * b;
+      col[i * 3 + 1] = c.g * b;
+      col[i * 3 + 2] = c.b * b;
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let k = 0; k < sys._futureBonds.length; k++) {
+      const [a, b, kind] = sys._futureBonds[k];
+      const p0 = k * 6, p1 = k * 6 + 3;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+
+      const avgProgress = (progressArr[a] + progressArr[b]) / 2;
+      const weight = kind === 'leg' ? 0.22 : 0.16;
+      const v = avgProgress * weight;
+      colorAt(((Math.floor(a / perRing) + Math.floor(b / perRing)) / 2) / (rings - 1), c);
+      bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
+      bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
+    }
+  },
 };
 
 export class ParticleEngine {
