@@ -44,6 +44,7 @@ export class HallScene {
 
     this._buildLights();
     this._buildHall();
+    this._buildWallLights();
     this._buildStations();
     this._buildThread();
   }
@@ -111,6 +112,53 @@ export class HallScene {
       );
       this.group.add(wall);
     }
+  }
+
+  // Simple rectangular wall sconces: a bright core plane plus a softer
+  // additive-blended glow plane behind it, repeated along both walls at a
+  // fixed spacing. Purely decorative filler for the long empty corridor --
+  // not a real light source (no PointLights; a bare emissive rectangle
+  // reads as "lit" cheaply and every instance shares one of two draw calls
+  // via InstancedMesh instead of one mesh pair per sconce).
+  _buildWallLights() {
+    const hw = config.hall.width / 2;
+    const zNear = this.stationZ(0) + config.camera.standBack + 4;
+    const zFar = this.stationZ(this.count - 1) - 8;
+    const y = (z) => this.floorY(z);
+    const spacing = 7; // half a station gap
+
+    const spots = [];
+    for (const sx of [-hw, hw]) {
+      const inward = sx > 0 ? -1 : 1;
+      for (let z = zNear; z >= zFar; z -= spacing) {
+        spots.push({ x: sx, ly: y(z) + 3.3, z, faceRotY: sx > 0 ? -Math.PI / 2 : Math.PI / 2, inward });
+      }
+    }
+
+    const coreGeo = new THREE.PlaneGeometry(0.5, 1.1);
+    const glowGeo = new THREE.PlaneGeometry(1.15, 2.0);
+    const coreMat = new THREE.MeshBasicMaterial({ color: P.lightKey });
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: P.lightKey, transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    });
+
+    const core = new THREE.InstancedMesh(coreGeo, coreMat, spots.length);
+    const glow = new THREE.InstancedMesh(glowGeo, glowMat, spots.length);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const upAxis = new THREE.Vector3(0, 1, 0);
+    const scale = new THREE.Vector3(1, 1, 1);
+    spots.forEach((s, i) => {
+      q.setFromAxisAngle(upAxis, s.faceRotY);
+      m.compose(new THREE.Vector3(s.x + s.inward * 0.03, s.ly, s.z), q, scale);
+      core.setMatrixAt(i, m);
+      m.compose(new THREE.Vector3(s.x + s.inward * 0.02, s.ly, s.z), q, scale);
+      glow.setMatrixAt(i, m);
+    });
+    core.instanceMatrix.needsUpdate = true;
+    glow.instanceMatrix.needsUpdate = true;
+    this.group.add(core, glow);
   }
 
   _buildStations() {
