@@ -22,6 +22,12 @@ import * as THREE from 'three';
 const STONE = new THREE.Color(0xe9e2d0);
 const STONE_DARK = new THREE.Color(0xcbbfa0);
 const STONE_LIGHT = new THREE.Color(0xfffbf2);
+// A bolder shadow tint for the capital's carved ornament (volutes, leaves) --
+// STONE_DARK alone reads too close to STONE at the real ~7.5-unit station
+// viewing distance, where thin detail needs real contrast, not just relief,
+// to stay legible (D36 follow-up: Kiwi found the capital read as a plain,
+// undecorated "back" from the actual in-game camera).
+const STONE_SHADOW = new THREE.Color(0x9c8a66);
 
 // ---- geometry helpers -------------------------------------------------
 
@@ -235,11 +241,13 @@ export function createColumnModel() {
   ];
   parts.push({ geometry: new THREE.LatheGeometry(coreProfile, 20), matrix: mat4(0, capitalBaseY, 0), color: STONE });
 
-  // Acanthus collar: two tiers of 8 leaves each, shingled.
-  const leafGeo = buildAcanthusLeafGeometry(0.32, 0.26, 0.08);
+  // Acanthus collar: two tiers of 8 leaves each, shingled. Sized boldly
+  // (not to the reference photo's literal proportions) so the leaf silhouette
+  // still reads at the real ~7.5-unit station viewing distance.
+  const leafGeo = buildAcanthusLeafGeometry(0.42, 0.34, 0.1);
   const leafCount = 8;
   for (let tier = 0; tier < 2; tier++) {
-    const tierY = capitalBaseY + 0.02 + tier * 0.13;
+    const tierY = capitalBaseY + 0.02 + tier * 0.15;
     const tierR = shaftR * (1.0 - tier * 0.06);
     const tierScale = 1 - tier * 0.15;
     for (let i = 0; i < leafCount; i++) {
@@ -248,14 +256,14 @@ export function createColumnModel() {
       const pos = new THREE.Vector3(Math.cos(a) * tierR, tierY, Math.sin(a) * tierR);
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -a + Math.PI / 2);
       m.compose(pos, q, new THREE.Vector3(tierScale, tierScale, tierScale));
-      parts.push({ geometry: leafGeo, matrix: m, color: STONE_DARK });
+      parts.push({ geometry: leafGeo, matrix: m, color: STONE_SHADOW });
     }
   }
 
   // Egg-and-dart band, stylized as a plain thin ring (blockout-tier detail).
   parts.push({
     geometry: new THREE.TorusGeometry(shaftR * 1.16, 0.02, 6, 24),
-    matrix: mat4(0, capitalBaseY + 0.26, 0, 1, 1, 1, Math.PI / 2, 0, 0),
+    matrix: mat4(0, capitalBaseY + 0.29, 0, 1, 1, 1, Math.PI / 2, 0, 0),
     color: STONE_LIGHT,
   });
 
@@ -263,8 +271,11 @@ export function createColumnModel() {
   // (negate x only, flip winding -- see mirrorGeometryX above).
   // Spiral curve is authored in the local XY plane, so it is already face-on
   // to the +Z (front) viewing direction with no extra rotation needed.
-  const voluteGeo = buildVoluteGeometry(1.6, 0.16, 0.02, 0.022);
-  const voluteY = capitalBaseY + 0.3;
+  // Bolder tube radius/reach than a literal scale-down of the reference --
+  // confirmed against the exact real station camera (position/lookAt formula
+  // from sceneSystem.js) that a thin coil disappears at that distance.
+  const voluteGeo = buildVoluteGeometry(1.6, 0.22, 0.03, 0.038);
+  const voluteY = capitalBaseY + 0.32;
   const voluteOffsetX = shaftR * 1.05;
   parts.push({
     geometry: voluteGeo,
@@ -286,7 +297,7 @@ export function createColumnModel() {
 
   // Abacus (macro): flat square cap slab.
   const abacusH = 0.07;
-  const capitalH = 0.41;
+  const capitalH = 0.52; // headroom for the bolder leaf/volute sizing above
   parts.push({
     geometry: new THREE.BoxGeometry(1.36, abacusH, 1.36),
     matrix: mat4(0, capitalBaseY + capitalH - abacusH / 2, 0),
