@@ -113,7 +113,7 @@ export const stations = [
   },
   {
     slide: 9,
-    state: 'placeholder',
+    state: 'dual-orbit',
     intensity: 0.75,
     accent: 0.5,
     text: [

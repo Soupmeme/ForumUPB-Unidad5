@@ -1134,6 +1134,116 @@ const handlers = {
       }
     }
   },
+
+  // Station 9: "Una vision. Dos generaciones." The referente's own closest
+  // match is its "duality" state (moment id `vision-generaciones`), already
+  // studied in motion-study.md (#4: the two generational poles differ in
+  // TEXTURE, not just color -- reused here from twin-reach's own version of
+  // that idea: elder dense/quiet, young sparse/turbulent). But this is a
+  // different beat than station 1: no reaching, no withdrawing, no bridge
+  // attempts, just two clearly distinct masses continuously and visibly in
+  // relation to one another. That relation is real, not implied: both
+  // masses co-orbit a shared, empty center (their positions come from ONE
+  // shared angle, not two independent ones), and each mass stays subtly
+  // elongated toward wherever the other currently is -- a quiet, continuous
+  // act of facing, recomputed every frame from the other mass's live
+  // position, not a fixed pose. No bonds cross between the two masses: the
+  // relationship here IS the orbit and the facing, not a connecting line.
+  'dual-orbit'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const half = sys.n >> 1;
+
+    if (!sys._orbitSetup) {
+      sys._orbitSetup = true;
+      const pairs = [];
+      const denseCount = 40, sparseCount = 10;
+      for (let k = 0; k < denseCount; k++) {
+        const a = (k * 7) % half, b = (k * 7 + 17) % half;
+        if (a !== b) pairs.push([a, b, 'elder']);
+      }
+      for (let k = 0; k < sparseCount; k++) {
+        const span = sys.n - half;
+        const a = half + (k * 13) % span, b = half + (k * 13 + 31) % span;
+        if (a !== b) pairs.push([a, b, 'young']);
+      }
+      sys._orbitBonds = pairs;
+      sys.bonds.geometry.setDrawRange(0, pairs.length * 2);
+    }
+
+    // A single shared angle drives both anchors -- diametrically opposite,
+    // always the same distance apart, sweeping the empty center between them.
+    const orbitRadius = 1.5, orbitSpeed = 0.12;
+    const theta = elapsed * orbitSpeed;
+    const eax = Math.cos(theta) * orbitRadius, eaz = Math.sin(theta) * orbitRadius;
+    const yax = -eax, yaz = -eaz;
+    const elderAngle = Math.atan2(yaz - eaz, yax - eax); // elder facing young
+    const youngAngle = elderAngle + Math.PI;             // young facing elder
+
+    const cr = config.station.cloudRadius * 0.5;
+    const breathe = 0.5 + 0.5 * Math.sin(elapsed * 0.7);
+
+    const fillMass = (from, to, anchorX, anchorZ, facingAngle, isElder) => {
+      const cs = Math.cos(facingAngle), sn = Math.sin(facingAngle);
+      const spread = isElder ? 0.52 : 0.86;
+      const faceStretch = isElder ? 0.12 : 0.24; // young leans in more visibly
+      const breatheAmp = isElder ? 0.08 : 0.22;
+      const tint = isElder ? elder : young;
+      for (let i = from; i < to; i++) {
+        const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+        // Rotate into the facing-aligned frame, stretch along it, rotate back.
+        const along = dx * cs + dz * sn;
+        const across = -dx * sn + dz * cs;
+        const along2 = along * (1 + faceStretch);
+        const across2 = across * (1 - faceStretch * 0.4);
+        const wx = along2 * cs - across2 * sn;
+        const wz = along2 * sn + across2 * cs;
+
+        const r = cr * sys.baseR[i] * (spread + breatheAmp * breathe);
+        let px = cx + anchorX + wx * r;
+        let py = cy + dy * r;
+        let pz = cz + anchorZ + wz * r;
+        if (!isElder) {
+          px += Math.sin(elapsed * 1.7 + sys.phase[i]) * 0.05;
+          py += Math.sin(elapsed * 1.3 + sys.phase[i] * 1.3) * 0.04;
+        }
+        pos[i * 3 + 0] = px; pos[i * 3 + 1] = py; pos[i * 3 + 2] = pz;
+
+        const flicker = isElder ? 1 : 0.82 + 0.18 * Math.sin(elapsed * 2.6 + sys.phase[i]);
+        const b = (isElder ? 0.4 + 0.14 * breathe : 0.32 + 0.24 * breathe) * flicker * (0.7 + e * 0.4);
+        col[i * 3 + 0] = tint.r * b;
+        col[i * 3 + 1] = tint.g * b;
+        col[i * 3 + 2] = tint.b * b;
+      }
+    };
+
+    fillMass(0, half, eax, eaz, elderAngle, true);
+    fillMass(half, sys.n, yax, yaz, youngAngle, false);
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let k = 0; k < sys._orbitBonds.length; k++) {
+      const [a, b, kind] = sys._orbitBonds[k];
+      const p0 = k * 6, p1 = k * 6 + 3;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      let br, bgc, bb;
+      if (kind === 'elder') {
+        // A dense, quietly-present lattice: established, doesn't flicker.
+        const v = 0.14 + 0.06 * breathe;
+        br = elder.r * v; bgc = elder.g * v; bb = elder.b * v;
+      } else {
+        // A few loose bonds that shimmer: still finding its own shape.
+        const flick = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * 1.9 + k));
+        const v = 0.08 + 0.12 * flick;
+        br = young.r * v; bgc = young.g * v; bb = young.b * v;
+      }
+      bcol[p0 + 0] = br; bcol[p0 + 1] = bgc; bcol[p0 + 2] = bb;
+      bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;
+    }
+  },
 };
 
 export class ParticleEngine {
