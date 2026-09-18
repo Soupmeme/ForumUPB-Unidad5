@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import { config } from './config.js';
+import { createColumnModel } from './columnModel.js';
 
 const P = config.palette;
 
@@ -115,20 +116,19 @@ export class HallScene {
   _buildStations() {
     this.plinthHeight = 2.2;
     this.labels = []; // per-station unlit text planes; text set via setLabel()
-    const plinthMat = new THREE.MeshStandardMaterial({ color: P.architecture, roughness: 0.8, metalness: 0.05 });
     const frameMat = new THREE.MeshStandardMaterial({ color: P.placardFrame, roughness: 0.55, metalness: 0.35 });
 
     for (let i = 0; i < this.count; i++) {
       const z = this.stationZ(i);
       const fy = this.floorY(z);
 
-      // Plinth: the plinth the exhibit (particle cloud) sits on.
-      const plinth = new THREE.Mesh(
-        new THREE.BoxGeometry(1.6, this.plinthHeight, 1.4),
-        plinthMat,
-      );
-      plinth.position.set(0, fy + this.plinthHeight / 2, z);
-      this.group.add(plinth);
+      // Pillar: a reconstructed classical column (img2threejs, decision
+      // D36) the exhibit's particle cloud floats above. Built to a fixed
+      // 2.2-unit total height matching this.plinthHeight exactly, so it
+      // drops in at the same base position the old plain box plinth used.
+      const pillar = createColumnModel();
+      pillar.position.set(0, fy, z);
+      this.group.add(pillar);
 
       // Label panel: a standing interpretive panel that CARRIES the client's
       // words as real in-world text (decision D3, revised). Bronze frame is
