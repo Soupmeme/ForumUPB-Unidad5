@@ -123,7 +123,7 @@ export const stations = [
   },
   {
     slide: 10,
-    state: 'placeholder',
+    state: 'bridge-rises',
     intensity: 0.9,
     accent: 0.5,
     text: [

@@ -1244,6 +1244,168 @@ const handlers = {
       bcol[p1 + 0] = br; bcol[p1 + 1] = bgc; bcol[p1 + 2] = bb;
     }
   },
+
+  // Station 10: "El crecimiento no ocurre cuando una generacion reemplaza a
+  // otra. Ocurre cuando trabajan juntas." The referente's own closest match
+  // is its "convergence" state (moment id literally `trabajan-juntas`),
+  // studied in motion-study.md #5: the two clusters barely move (only a
+  // partial pull toward a shared point, never a full merge) -- what
+  // actually changes is the BONDS, arcs that stretch to bridge the two
+  // zones. The connection is the story, not colliding the masses together.
+  // Kiwi's own direction: keep both masses fully distinct (unlike station
+  // 6's exchange or station 7's full merge) and just build the bridge. So
+  // almost every particle here stays in its home mass, undisturbed -- only
+  // a handful of each mass's own innermost, gap-facing particles (real
+  // particles, the same technique as station 1's bridge tendrils) leave
+  // formation to become the bridge's own rungs and struts, rising tier by
+  // tier as the station activates (sys.activeTime, D18), staggered
+  // bottom-to-top so the growth is watched happening. Every rung needs one
+  // particle from EACH side -- the bridge structurally cannot exist without
+  // both, which is the whole point of the line.
+  'bridge-rises'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const c = new THREE.Color();
+    const gapHalf = 1.6;
+    const half = sys.n >> 1;
+
+    if (!sys._bridgeSetup) {
+      sys._bridgeSetup = true;
+      const tiers = 7;
+      sys._bridgeTiers = tiers;
+
+      // The innermost particles of each mass -- the ones already facing the
+      // gap -- become the builders (station 1's own "innermost" technique).
+      const innermost = (from, to, side, count) => {
+        const scored = [];
+        for (let i = from; i < to; i++) scored.push([i, sys.baseDir[i * 3 + 0] * -side]);
+        scored.sort((a, b) => b[1] - a[1]);
+        return scored.slice(0, count).map((p) => p[0]);
+      };
+      const elderBuilders = innermost(0, half, -1, tiers);
+      const youngBuilders = innermost(half, sys.n, 1, tiers);
+      sys._bridgeElder = elderBuilders;
+      sys._bridgeYoung = youngBuilders;
+
+      // Rungs cross between the two sides at each tier; posts climb each
+      // side; diagonal braces zigzag between tiers -- a proper truss, not
+      // just a stack of floating lines.
+      const bonds = [];
+      for (let k = 0; k < tiers; k++) bonds.push([elderBuilders[k], youngBuilders[k], 'rung']);
+      for (let k = 0; k < tiers - 1; k++) {
+        bonds.push([elderBuilders[k], elderBuilders[k + 1], 'post']);
+        bonds.push([youngBuilders[k], youngBuilders[k + 1], 'post']);
+        bonds.push([elderBuilders[k], youngBuilders[k + 1], 'brace']);
+        bonds.push([youngBuilders[k], elderBuilders[k + 1], 'brace']);
+      }
+      sys._bridgeBonds = bonds;
+      sys._bridgeProgress = new Float32Array(sys.n);
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
+    }
+
+    const tiers = sys._bridgeTiers;
+    const elderBuilders = sys._bridgeElder, youngBuilders = sys._bridgeYoung;
+    const progressArr = sys._bridgeProgress;
+    const cr = config.station.cloudRadius * 0.5;
+
+    // The two masses: full density, undisturbed, breathing gently in place.
+    // Distinct on purpose -- this station doesn't merge them, it connects them.
+    const breatheL = 0.5 + 0.5 * Math.sin(elapsed * 0.8);
+    const breatheR = 0.5 + 0.5 * Math.sin(elapsed * 1.3 + 0.9);
+    for (let i = 0; i < sys.n; i++) {
+      const side = i < half ? -1 : 1;
+      const isElder = side < 0;
+      const breathe = isElder ? breatheL : breatheR;
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const spread = isElder ? 0.56 : 0.88;
+      const breatheAmp = isElder ? 0.1 : 0.22;
+      let r = cr * sys.baseR[i] * (spread + breatheAmp * breathe);
+      if (!isElder) r += Math.sin(elapsed * 1.8 + sys.phase[i]) * 0.05;
+      pos[i * 3 + 0] = cx + side * gapHalf + dx * r;
+      pos[i * 3 + 1] = cy + dy * r + (isElder ? 0 : Math.sin(elapsed * 1.1 + sys.phase[i]) * 0.04);
+      pos[i * 3 + 2] = cz + dz * r;
+
+      const tint = isElder ? elder : young;
+      const flicker = isElder ? 1 : 0.85 + 0.15 * Math.sin(elapsed * 3 + sys.phase[i]);
+      const b = (isElder ? 0.4 + 0.16 * breathe : 0.32 + 0.26 * breathe) * flicker * (0.75 + e * 0.35);
+      col[i * 3 + 0] = tint.r * b;
+      col[i * 3 + 1] = tint.g * b;
+      col[i * 3 + 2] = tint.b * b;
+      progressArr[i] = 0; // overwritten below for the builder particles only
+    }
+
+    // The bridge: builds tier by tier bottom-up, holds complete, then
+    // deconstructs top-down (the top -- the newest, least settled tier --
+    // is the first to give), holds empty, and builds again -- on loop for
+    // as long as the station stays active. Kiwi's own request: growth isn't
+    // a single event here, it's shown as something that keeps happening.
+    const tierStagger = 0.7, travelDur = 1.3, holdStart = 0.6;
+    const buildDur = (tiers - 1) * tierStagger + travelDur;
+    const holdFull = 1.2, holdEmpty = 0.8;
+    const deconstructStart = holdStart + buildDur + holdFull;
+    const cycleLen = deconstructStart + buildDur + holdEmpty;
+    const cycleT = ((sys.activeTime % cycleLen) + cycleLen) % cycleLen;
+
+    const baseY = -0.55, tierSpacing = 0.19, towerHalf = 0.62;
+    for (let k = 0; k < tiers; k++) {
+      let progress;
+      if (cycleT < deconstructStart) {
+        // Building: bottom tier (k=0) goes first.
+        const tStart = holdStart + k * tierStagger;
+        progress = smoothstep(tStart, tStart + travelDur, cycleT);
+      } else {
+        // Deconstructing: top tier goes first, mirrored pacing.
+        const td = cycleT - deconstructStart;
+        const tStart = (tiers - 1 - k) * tierStagger;
+        progress = 1 - smoothstep(tStart, tStart + travelDur, td);
+      }
+      const ty = cy + baseY + k * tierSpacing;
+
+      const ei = elderBuilders[k], yi = youngBuilders[k];
+      progressArr[ei] = progress; progressArr[yi] = progress;
+
+      const ex0 = pos[ei * 3 + 0], ey0 = pos[ei * 3 + 1], ez0 = pos[ei * 3 + 2];
+      const ex1 = cx - towerHalf, ey1 = ty, ez1 = cz;
+      pos[ei * 3 + 0] = ex0 + (ex1 - ex0) * progress;
+      pos[ei * 3 + 1] = ey0 + (ey1 - ey0) * progress;
+      pos[ei * 3 + 2] = ez0 + (ez1 - ez0) * progress;
+
+      const yx0 = pos[yi * 3 + 0], yy0 = pos[yi * 3 + 1], yz0 = pos[yi * 3 + 2];
+      const yx1 = cx + towerHalf, yy1 = ty, yz1 = cz;
+      pos[yi * 3 + 0] = yx0 + (yx1 - yx0) * progress;
+      pos[yi * 3 + 1] = yy0 + (yy1 - yy0) * progress;
+      pos[yi * 3 + 2] = yz0 + (yz1 - yz0) * progress;
+
+      // Both builders warm toward `hot` as they arrive -- the established
+      // "something new taking shape" signal (stations 1, 5, 6, 7, 8).
+      c.copy(elder).lerp(hot, progress * 0.5);
+      const eb = (0.4 + e * 0.3) * (0.3 + progress * 0.7);
+      col[ei * 3 + 0] = c.r * eb; col[ei * 3 + 1] = c.g * eb; col[ei * 3 + 2] = c.b * eb;
+      c.copy(young).lerp(hot, progress * 0.5);
+      const yb = (0.36 + e * 0.32) * (0.3 + progress * 0.7);
+      col[yi * 3 + 0] = c.r * yb; col[yi * 3 + 1] = c.g * yb; col[yi * 3 + 2] = c.b * yb;
+    }
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let idx = 0; idx < sys._bridgeBonds.length; idx++) {
+      const [a, b, kind] = sys._bridgeBonds[idx];
+      const p0 = idx * 6, p1 = idx * 6 + 3;
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+
+      // Every bond's color is literally both generations blended -- neither
+      // side owns the bridge -- brightening toward `hot` as it completes.
+      const avgProgress = (progressArr[a] + progressArr[b]) / 2;
+      const weight = kind === 'rung' ? 0.3 : kind === 'post' ? 0.2 : 0.14;
+      const v = avgProgress * weight;
+      c.copy(elder).lerp(young, 0.5).lerp(hot, avgProgress * 0.35);
+      bcol[p0 + 0] = c.r * v; bcol[p0 + 1] = c.g * v; bcol[p0 + 2] = c.b * v;
+      bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
+    }
+  },
 };
 
 export class ParticleEngine {
