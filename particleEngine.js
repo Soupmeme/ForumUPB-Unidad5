@@ -1406,6 +1406,148 @@ const handlers = {
       bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
     }
   },
+
+  // Station 11: "Los jovenes no son el futuro. Son el presente que muchas
+  // organizaciones aun no ven." The referente's own version of this moment
+  // (moment id `presente-joven`, state "present") turns out thin -- just its
+  // generic default swirl pulled slightly toward the viewer, plus a generic
+  // decorative "energy traces" layer with no real tie to the line's meaning.
+  // Nothing bespoke to borrow here, so this one is ours more than most.
+  //
+  // The line names ORGANIZATIONS as the ones failing to see, not the elder
+  // generation -- so the other actor here is institution (D19), not elder,
+  // a deliberate break from stations 5-10's elder/young pairing. Young sits
+  // fully formed, vivid, complete, stable at a fixed point -- not arriving,
+  // not becoming, because the whole point of the line is that it is already
+  // here. Institution is a searching wedge that sweeps almost the entire
+  // circle around the shared center, forever, but its math guarantees it
+  // never quite reaches the small angular slice where young actually sits --
+  // it always eases to a stop just short, holds, and reverses. A literal,
+  // structural "no ven": the gap is not incidental, it is the one place the
+  // sweep is built to never cover. At its closest approach a single probe
+  // (station 1's own reach-without-touching device) stretches from the
+  // wedge's nearest real edge particle toward young and pulls back again,
+  // capped well short -- so close, and still nothing lands.
+  'unseen-present'(sys, elapsed) {
+    const pos = sys.points.geometry.attributes.position.array;
+    const col = sys.points.geometry.attributes.color.array;
+    const cx = sys.center.x, cy = sys.center.y, cz = sys.center.z;
+    const e = sys.params.energy;
+    const c = new THREE.Color();
+
+    const rows = 14, cols = 10;
+    const institutionCount = rows * cols; // 140
+    const youngCount = sys.n - institutionCount;
+    const idx = (row, colI) => youngCount + row * cols + colI;
+
+    if (!sys._presentSetup) {
+      sys._presentSetup = true;
+      const bonds = [];
+      for (let row = 0; row < rows - 1; row++) {
+        bonds.push([idx(row, 0), idx(row + 1, 0), 'edge']);
+        bonds.push([idx(row, cols - 1), idx(row + 1, cols - 1), 'edge']);
+      }
+      bonds.push([idx(rows - 1, 0), idx(rows - 1, cols - 1), 'rim']);
+      // A little internal texture for young -- the same sparse, shimmering
+      // bonds used everywhere else this mass appears (twin-reach onward).
+      for (let k = 0; k < 10; k++) {
+        const a = (k * 13) % youngCount, b = (k * 13 + 31) % youngCount;
+        if (a !== b) bonds.push([a, b, 'young']);
+      }
+      bonds.push([idx(rows - 1, 0), idx(rows - 1, 0), 'probe']); // endpoints overwritten every frame
+      sys._presentBonds = bonds;
+      sys.bonds.geometry.setDrawRange(0, bonds.length * 2);
+    }
+
+    // Young: fixed, whole, vivid -- already here, not on its way anywhere.
+    const youngRadius = 0.85;
+    const youngAnchor = { x: cx + youngRadius, y: cy, z: cz };
+    const cr = config.station.cloudRadius * 0.4;
+    for (let i = 0; i < youngCount; i++) {
+      const dx = sys.baseDir[i * 3 + 0], dy = sys.baseDir[i * 3 + 1], dz = sys.baseDir[i * 3 + 2];
+      const r = cr * sys.baseR[i] * (0.85 + 0.15 * Math.sin(elapsed * 1.4 + sys.phase[i]));
+      pos[i * 3 + 0] = youngAnchor.x + dx * r + Math.sin(elapsed * 1.6 + sys.phase[i]) * 0.04;
+      pos[i * 3 + 1] = youngAnchor.y + dy * r + Math.sin(elapsed * 1.2 + sys.phase[i] * 1.3) * 0.03;
+      pos[i * 3 + 2] = youngAnchor.z + dz * r;
+
+      const flicker = 0.86 + 0.14 * Math.sin(elapsed * 2.8 + sys.phase[i]);
+      const b = (0.46 + e * 0.3) * flicker;
+      col[i * 3 + 0] = young.r * b;
+      col[i * 3 + 1] = young.g * b;
+      col[i * 3 + 2] = young.b * b;
+    }
+
+    // Institution: a wedge sweeping the far ~294 degrees, oscillating so its
+    // own edges are mathematically incapable of reaching young's position.
+    const innerR = 1.5, outerR = 2.0, beamHalfWidth = 0.4, edgeGap = 0.35;
+    const sweepAmplitude = Math.PI - edgeGap - beamHalfWidth;
+    const beamCenter = Math.PI + sweepAmplitude * Math.sin(elapsed * 0.16);
+    const wrap = (a) => (((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
+
+    for (let row = 0; row < rows; row++) {
+      const rf = row / (rows - 1);
+      const radius = innerR + rf * (outerR - innerR);
+      for (let colI = 0; colI < cols; colI++) {
+        const i = idx(row, colI);
+        const af = (colI / (cols - 1)) * 2 - 1; // -1 .. 1 across the wedge
+        const angle = beamCenter + af * beamHalfWidth;
+        const vert = sys.baseDir[i * 3 + 1] * 0.05;
+        pos[i * 3 + 0] = cx + Math.cos(angle) * radius;
+        pos[i * 3 + 1] = cy + vert;
+        pos[i * 3 + 2] = cz + Math.sin(angle) * radius;
+
+        const edgeBoost = Math.abs(af); // the straining edges read brighter than the middle
+        const b = (0.22 + e * 0.16) * (0.55 + edgeBoost * 0.7);
+        col[i * 3 + 0] = institution.r * b;
+        col[i * 3 + 1] = institution.g * b;
+        col[i * 3 + 2] = institution.b * b;
+      }
+    }
+
+    // Whichever edge is nearer angle 0 (young's angle) right now.
+    const edgeLeft = wrap(beamCenter - beamHalfWidth), edgeRight = wrap(beamCenter + beamHalfWidth);
+    const nearIsLeft = Math.abs(edgeLeft) < Math.abs(edgeRight);
+    const edgeDist = Math.abs(nearIsLeft ? edgeLeft : edgeRight);
+    const nearIdx = idx(rows - 1, nearIsLeft ? 0 : cols - 1);
+
+    const bpos = sys.bonds.geometry.attributes.position.array;
+    const bcol = sys.bonds.geometry.attributes.color.array;
+    for (let k = 0; k < sys._presentBonds.length; k++) {
+      const [a, b, kind] = sys._presentBonds[k];
+      const p0 = k * 6, p1 = k * 6 + 3;
+
+      if (kind === 'probe') {
+        // Fades in as the near edge approaches, reaches at most 60% of the
+        // way to young, and pulls back again -- never touching (station 1's
+        // own device, reused here for an unmistakably similar meaning).
+        const probeThreshold = 0.9;
+        const probeT = clamp01(1 - (edgeDist - edgeGap) / (probeThreshold - edgeGap));
+        const ax = pos[nearIdx * 3 + 0], ay = pos[nearIdx * 3 + 1], az = pos[nearIdx * 3 + 2];
+        const tx = ax + (youngAnchor.x - ax) * probeT * 0.6;
+        const ty = ay + (youngAnchor.y - ay) * probeT * 0.6;
+        const tz = az + (youngAnchor.z - az) * probeT * 0.6;
+        bpos[p0 + 0] = ax; bpos[p0 + 1] = ay; bpos[p0 + 2] = az;
+        bpos[p1 + 0] = tx; bpos[p1 + 1] = ty; bpos[p1 + 2] = tz;
+        c.copy(institution).lerp(hot, probeT * 0.5);
+        const v = probeT * 0.5;
+        bcol[p0 + 0] = c.r * v * 0.4; bcol[p0 + 1] = c.g * v * 0.4; bcol[p0 + 2] = c.b * v * 0.4;
+        bcol[p1 + 0] = c.r * v; bcol[p1 + 1] = c.g * v; bcol[p1 + 2] = c.b * v;
+        continue;
+      }
+
+      bpos[p0 + 0] = pos[a * 3 + 0]; bpos[p0 + 1] = pos[a * 3 + 1]; bpos[p0 + 2] = pos[a * 3 + 2];
+      bpos[p1 + 0] = pos[b * 3 + 0]; bpos[p1 + 1] = pos[b * 3 + 1]; bpos[p1 + 2] = pos[b * 3 + 2];
+      let v, tint;
+      if (kind === 'young') {
+        const flick = 0.4 + 0.6 * Math.max(0, Math.sin(elapsed * 1.7 + k));
+        v = 0.08 + 0.12 * flick; tint = young;
+      } else {
+        v = kind === 'rim' ? 0.16 : 0.22; tint = institution;
+      }
+      bcol[p0 + 0] = tint.r * v; bcol[p0 + 1] = tint.g * v; bcol[p0 + 2] = tint.b * v;
+      bcol[p1 + 0] = tint.r * v; bcol[p1 + 1] = tint.g * v; bcol[p1 + 2] = tint.b * v;
+    }
+  },
 };
 
 export class ParticleEngine {

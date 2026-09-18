@@ -135,7 +135,7 @@ export const stations = [
   },
   {
     slide: 11,
-    state: 'placeholder',
+    state: 'unseen-present',
     intensity: 0.8,
     accent: 0.8,
     text: [
