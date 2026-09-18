@@ -225,5 +225,5 @@ La linea vuelve a tener forma de negacion + afirmacion, como la estacion 10: her
 
 La disposicion reusa el patron de "spokes x shells" de la estacion 7 (30 x 12 = exactamente `sys.n`), pero orientado VERTICAL en vez de plano -- una silueta nueva entre las estaciones (la mayoria han sido composiciones horizontales), con cada anillo ligeramente girado respecto al anterior para que se lea como una torre en obra, no como una forma extruida de una sola vez.
 
-## Pendiente de autoría por estación (iterativo, con Kiwi)
-El shell usa un manejador de partículas genérico ("placeholder") en las 13 estaciones, variando solo la intensidad para demostrar el ruteo de datos de punta a punta. El significado real de cada estación (su `state`, sus parámetros y su sistema de partículas propio) se autora estación por estación DESPUÉS de que el shell funcione completo. Vocabulario de parámetros propuesto para esa fase (a confirmar/revisar por Kiwi): cohesion, dispersion, flow, convergence, emergence.
+## Autoría por estación: completa
+Las 12 estaciones narrativas (1 a 12) tienen sistema de partículas propio, autorado iterativamente con Kiwi y documentado arriba (D17 a D35). La estación 13 (cierre con QR) se deja con el manejador genérico ("placeholder") a proposito, por decisión de Kiwi: es la placa de cierre con codigos QR, no otro momento del guion que requiera su propia traducción.

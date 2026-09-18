@@ -42,4 +42,4 @@ Contenido y render están desacoplados (esa separación es lo que obliga a que t
 
 ## Estado
 
-Shell funcional de punta a punta. Estaciones 1 a 7 tienen sistema de partículas propio, autorado y aprobado iterativamente; las estaciones 8 a 13 siguen con arte genérico ("placeholder") a la espera de autoría.
+Completo. Las 12 estaciones narrativas (1 a 12) tienen sistema de partículas propio, autorado y aprobado iterativamente con Kiwi; el detalle de cada una está en [`decisions.md`](decisions.md). La estación 13 (cierre con QR) se deja intencionalmente con el arte genérico ("placeholder"), por decisión de Kiwi.
